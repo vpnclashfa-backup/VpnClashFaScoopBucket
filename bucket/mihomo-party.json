@@ -1,0 +1,45 @@
+﻿{
+    "version": "1.7.3",
+    "description": "A GUI client for mihomo (Clash.Meta core).",
+    "homepage": "https://github.com/mihomo-party-org/mihomo-party",
+    "license": "GPL-3.0-only",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/mihomo-party-org/mihomo-party/releases/download/v1.7.3/mihomo-party-windows-1.7.3-x64-setup.exe",
+            "hash": ""
+        }
+    },
+    "installer": {
+        "script": [
+            "$processOptions = @{",
+            "    FilePath     = \"$dir\\$fname\"",
+            "    ArgumentList = @('/S', \"/D=`\"$dir`\"\")",
+            "    Wait         = $true",
+            "    PassThru     = $true",
+            "    Verb         = 'RunAs'",
+            "}",
+            "$process = Start-Process @processOptions",
+            "if ($process.ExitCode -ne 0) {",
+            "    error \"Installer exited with code: $($process.ExitCode)\"",
+            "    exit 1",
+            "}"
+        ]
+    },
+    "bin": "mihomo-party.exe",
+    "shortcuts": [
+        [
+            "mihomo-party.exe",
+            "Mihomo Party"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/mihomo-party-org/mihomo-party"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/mihomo-party-org/mihomo-party/releases/download/v$version/mihomo-party-windows-$version-x64-setup.exe"
+            }
+        }
+    }
+}

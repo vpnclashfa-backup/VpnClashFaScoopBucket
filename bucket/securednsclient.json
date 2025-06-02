@@ -1,0 +1,48 @@
+{
+    "version": "3.2.7",
+    "description": "A DNS Client Supporting DNSCrypt, Anonymized DNSCrypt, DoH, DoT, UDP And TCP.",
+    "homepage": "https://github.com/msasanmh/DNSveil",
+    "license": "GPL-3.0-only",
+    "notes": "Installer version of SecureDNSClient.",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/msasanmh/DNSveil/releases/download/v3.2.7/SecureDNSClient_v3.2.7_x64_Installer.exe",
+            "hash": ""
+        }
+    },
+    "installer": {
+        "script": [
+            "Write-Host \"Attempting to install $fname silently to $dir\"",
+            "$processOptions = @{",
+            "    FilePath     = \"$dir\\$fname\"",
+            "    ArgumentList = @('/S', \"/D=`\"$dir`\"\")",
+            "    Wait         = $true",
+            "    PassThru     = $true",
+            "    Verb         = 'RunAs'",
+            "}",
+            "$process = Start-Process @processOptions",
+            "if ($process.ExitCode -ne 0) {",
+            "    error \"Installer exited with code: $($process.ExitCode)\"",
+            "    exit 1",
+            "}",
+            "Write-Host \"Installation probably finished. Check $dir for SecureDNSClient.exe\""
+        ]
+    },
+    "bin": "SecureDNSClient.exe",
+    "shortcuts": [
+        [
+            "SecureDNSClient.exe",
+            "Secure DNS Client"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/msasanmh/DNSveil"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/msasanmh/DNSveil/releases/download/v$version/SecureDNSClient_v$version_x64_Installer.exe"
+            }
+        }
+    }
+}

@@ -1,0 +1,31 @@
+{
+    "version": "4.3.5",
+    "description": "A V2Ray GUI client for Windows and Linux, based on Qt.",
+    "homepage": "https://github.com/Mahdi-zarei/nekoray",
+    "license": "GPL-3.0-only",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/Mahdi-zarei/nekoray/releases/download/4.3.5/nekoray-4.3.5-2025-05-16-windows64.zip",
+            "hash": ""
+        }
+    },
+    "extract_dir": "nekoray",
+    "bin": "nekoray.exe",
+    "shortcuts": [
+        [
+            "nekoray.exe",
+            "NekoRay"
+        ]
+    ],
+    "persist": "config",
+    "checkver": {
+        "github": "https://github.com/Mahdi-zarei/nekoray"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/Mahdi-zarei/nekoray/releases/download/$version/nekoray-$version-DATE_PART_IS_UNKNOWN-windows64.zip#/dl.zip"
+            }
+        }
+    }
+}

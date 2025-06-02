@@ -56,13 +56,14 @@ def update_readme_file(readme_path: Path, app_names: list[str], bucket_name_for_
 
 This is a personal Scoop bucket for easily installing software.
 
-## How to Use
+## How to Use / scoop
 
-To add this bucket to Scoop, run the following command in PowerShell:
+```powershell
+scoop bucket add {bucket_name_for_display} {repo_url_for_readme}
+scoop install {bucket_name_for_display}/<program-name>
+```
 
-`scoop bucket add {bucket_name_for_display} {repo_url_for_readme}`
-
-## Available Applications
+## Packages
 
 {APP_LIST_START_PLACEHOLDER}
 The list of applications will be populated here when the action runs next.
@@ -71,7 +72,7 @@ The list of applications will be populated here when the action runs next.
         try:
             readme_path.write_text(default_readme_content, encoding='utf-8')
             print(f"A sample README.md was created at '{readme_path}'.")
-            return True # Indicate that README was changed (created)
+            readme_content_changed = True # README was created/changed
         except Exception as e:
             print(f"Error creating sample README.md: {e}")
             return False
@@ -80,33 +81,33 @@ The list of applications will be populated here when the action runs next.
         current_readme_content = readme_path.read_text(encoding='utf-8')
     except Exception as e:
         print(f"Error reading README.md content from '{readme_path}': {e}")
-        return False
+        return False # Cannot proceed if README cannot be read
 
-    app_list_markdown = ""
+    # Generate the new app list in the desired plain format
+    app_list_plain_text = []
     if app_names:
         for app_name in sorted(app_names):
-            app_list_markdown += f"- `{app_name}`\n"
+            app_list_plain_text.append(app_name)
     else:
-        app_list_markdown = "No applications have been added to this bucket yet.\n"
+        app_list_plain_text.append("No applications have been added to this bucket yet.")
+    
+    formatted_app_list_for_readme = "\n".join(app_list_plain_text)
 
     start_index = current_readme_content.find(APP_LIST_START_PLACEHOLDER)
     end_index = current_readme_content.find(APP_LIST_END_PLACEHOLDER)
 
     if start_index != -1 and end_index != -1 and end_index > start_index:
         content_before_list = current_readme_content[:start_index + len(APP_LIST_START_PLACEHOLDER)]
-        # Ensure there's a newline after the start placeholder in the new content
-        if not content_before_list.endswith('\n'):
+        if not content_before_list.endswith('\n'): # Ensure newline after start placeholder
             content_before_list += '\n'
         
         content_after_list = current_readme_content[end_index:]
-        # Ensure there's a newline before the end placeholder if the app list is not empty
-        # or ensure there is if it is empty
-        if app_list_markdown.strip() == "" or app_list_markdown.endswith('\n'):
-             middle_content = app_list_markdown
-        else:
-             middle_content = app_list_markdown + '\n'
-
-        new_readme_content = f"{content_before_list}{middle_content}{content_after_list}"
+        # Ensure newline before end placeholder
+        effective_app_list = formatted_app_list_for_readme
+        if not effective_app_list.endswith('\n'):
+            effective_app_list += '\n'
+            
+        new_readme_content = f"{content_before_list}{effective_app_list}{content_after_list}"
         
         if new_readme_content != current_readme_content:
             try:
@@ -116,7 +117,7 @@ The list of applications will be populated here when the action runs next.
             except Exception as e:
                 print(f"Error updating README.md with the application list: {e}")
         else:
-            print("README.md content is already up-to-date.")
+            print("README.md content (app list) is already up-to-date.")
     else:
         print(f"Warning: Placeholders '{APP_LIST_START_PLACEHOLDER}' and/or '{APP_LIST_END_PLACEHOLDER}' not found in README.md.")
         print("The application list was not added to README.md. Please add the placeholders manually.")
@@ -133,11 +134,11 @@ def main():
 
     if not bucket_dir_path.is_dir():
         print(f"Error: Bucket directory '{bucket_dir_path}' not found.")
-        exit(1) # Exit with error if bucket dir not found
+        exit(1)
 
     manifest_files_paths = list(bucket_dir_path.glob("*.json"))
-    processed_app_names = []
-    any_manifest_file_updated_in_run = False
+    processed_app_names_for_readme = []
+    any_file_changed_in_run = False # Tracks if manifests or README changed
 
     if not manifest_files_paths:
         print(f"No manifest files (.json) found in '{bucket_dir_path}'.")
@@ -146,128 +147,131 @@ def main():
             app_name = manifest_path.stem
             print(f"\nProcessing manifest: {app_name} (File: {manifest_path.name})")
             print("---------------------------")
-            manifest_data = None
+            manifest_data_object = None # Renamed
             
-            # 1. Run 'scoop checkver -u'
             print(f"Running 'scoop checkver \"{app_name}\" -u'...")
             try:
-                checkver_command = ["pwsh", "-NoProfile", "-Command", f"scoop checkver '{app_name}' -u"]
-                checkver_process = subprocess.run(
-                    checkver_command, capture_output=True, text=True, check=False, encoding='utf-8', errors='replace'
+                checkver_command_args = ["pwsh", "-NoProfile", "-Command", f"scoop checkver '{app_name}' -u"] # Renamed
+                checkver_run_result = subprocess.run( # Renamed
+                    checkver_command_args, capture_output=True, text=True, check=False, encoding='utf-8', errors='replace'
                 )
-                if checkver_process.returncode != 0:
-                    print(f"  Warning: Command `{' '.join(checkver_command)}` finished with exit code {checkver_process.returncode}.")
-                    if checkver_process.stdout and checkver_process.stdout.strip(): print(f"    Scoop Checkver STDOUT:\n{checkver_process.stdout.strip()}")
-                    if checkver_process.stderr and checkver_process.stderr.strip(): print(f"    Scoop Checkver STDERR:\n{checkver_process.stderr.strip()}")
+                if checkver_run_result.returncode != 0:
+                    print(f"  Warning: Command `{' '.join(checkver_command_args)}` finished with exit code {checkver_run_result.returncode}.")
+                    if checkver_run_result.stdout and checkver_run_result.stdout.strip(): print(f"    Scoop Checkver STDOUT:\n{checkver_run_result.stdout.strip()}")
+                    if checkver_run_result.stderr and checkver_run_result.stderr.strip(): print(f"    Scoop Checkver STDERR:\n{checkver_run_result.stderr.strip()}")
                 else:
                     print(f"  'scoop checkver -u' for '{app_name}' executed successfully (or no update was needed).")
-                    if checkver_process.stdout and checkver_process.stdout.strip(): print(f"    Scoop Checkver Output:\n{checkver_process.stdout.strip()}")
+                    if checkver_run_result.stdout and checkver_run_result.stdout.strip(): print(f"    Scoop Checkver Output:\n{checkver_run_result.stdout.strip()}")
             except FileNotFoundError:
                 print("  Error: 'pwsh' (PowerShell) not found. Cannot run 'scoop checkver'.")
             except Exception as e:
                 print(f"  Warning: Error during execution of 'scoop checkver \"{app_name}\" -u': {e}")
 
-            # 2. Read manifest content
             try:
-                with open(manifest_path, 'r', encoding='utf-8-sig') as f: # Use utf-8-sig to handle BOM
-                    manifest_data = json.load(f)
+                with open(manifest_path, 'r', encoding='utf-8-sig') as f:
+                    manifest_data_object = json.load(f)
             except Exception as e:
                 print(f"  Error reading or parsing JSON manifest file '{manifest_path}': {e}")
+                any_file_changed_in_run = True
                 continue
 
-            # 3. Extract download URL and current hash
-            download_url = None
-            current_hash_in_manifest = None
-            hash_path_in_json = [] # To know where to update the hash
+            download_url_from_manifest = None; hash_from_manifest = None # Renamed
+            json_hash_path_keys = [] # Renamed
 
-            if manifest_data.get("architecture", {}).get("64bit", {}).get("url"):
-                download_url = manifest_data["architecture"]["64bit"]["url"]
-                current_hash_in_manifest = manifest_data["architecture"]["64bit"].get("hash")
-                hash_path_in_json = ["architecture", "64bit", "hash"]
-            elif manifest_data.get("url"):
-                download_url = manifest_data["url"]
-                current_hash_in_manifest = manifest_data.get("hash")
-                hash_path_in_json = ["hash"]
+            if manifest_data_object.get("architecture", {}).get("64bit", {}).get("url"):
+                download_url_from_manifest = manifest_data_object["architecture"]["64bit"]["url"]
+                hash_from_manifest = manifest_data_object["architecture"]["64bit"].get("hash")
+                json_hash_path_keys = ["architecture", "64bit", "hash"]
+            elif manifest_data_object.get("url"):
+                download_url_from_manifest = manifest_data_object["url"]
+                hash_from_manifest = manifest_data_object.get("hash")
+                json_hash_path_keys = ["hash"]
             
-            if not download_url:
-                print(f"  Warning: 'url' field not found or empty in manifest '{app_name}'. Skipping hash update for this file.")
-                processed_app_names.append(app_name)
+            if not download_url_from_manifest:
+                print(f"  Warning: 'url' field not found or empty in manifest '{app_name}'. Skipping hash update.")
+                processed_app_names_for_readme.append(app_name)
                 continue
             
-            print(f"  Download URL found: {download_url}")
-            print(f"  Current hash in manifest: {current_hash_in_manifest}")
+            print(f"  Download URL found: {download_url_from_manifest}")
+            print(f"  Current hash in manifest: {hash_from_manifest}")
 
-            # 4. Download file
-            temp_download_dir = repo_root / "temp_scoop_downloads_py" # Unique temp dir name
-            temp_download_dir.mkdir(exist_ok=True)
-            url_filename_part = os.path.basename(download_url.split('?')[0])
-            safe_filename = "".join(c if c.isalnum() or c in ['.', '-', '_'] else '_' for c in url_filename_part)
-            if not safe_filename: safe_filename = "downloaded_file" # Fallback if basename is strange
-            temp_file_path = temp_download_dir / f"{app_name}_{safe_filename}.tmp"
+            temp_download_folder = repo_root / "temp_scoop_downloads_python_v2" # Renamed
+            temp_download_folder.mkdir(exist_ok=True)
+            url_filename = os.path.basename(download_url_from_manifest.split('?')[0])
+            safe_temp_filename = "".join(c if c.isalnum() or c in ['.', '-', '_'] else '_' for c in url_filename) # Renamed
+            if not safe_temp_filename: safe_temp_filename = "downloaded_asset"
+            path_to_temp_file = temp_download_folder / f"{app_name}_{safe_temp_filename}.tmp" # Renamed
 
-            download_successful = download_file_from_url(download_url, temp_file_path)
-            newly_calculated_hash = None
+            is_download_successful = download_file_from_url(download_url_from_manifest, path_to_temp_file) # Renamed
+            calculated_new_hash = None # Renamed
 
-            if download_successful:
-                newly_calculated_hash = calculate_sha256_hash(temp_file_path)
-                if newly_calculated_hash:
-                    print(f"  New calculated hash for '{app_name}': {newly_calculated_hash}")
+            if is_download_successful:
+                calculated_new_hash = calculate_sha256_hash(path_to_temp_file)
+                if calculated_new_hash:
+                    print(f"  New calculated hash for '{app_name}': {calculated_new_hash}")
             
-            if temp_file_path.exists():
-                os.remove(temp_file_path)
-            if temp_download_dir.exists() and not any(temp_download_dir.iterdir()):
-                 temp_download_dir.rmdir()
+            if path_to_temp_file.exists():
+                os.remove(path_to_temp_file)
+            if temp_download_folder.exists() and not any(temp_download_folder.iterdir()): # Remove if empty
+                 temp_download_folder.rmdir()
 
-            # 5. Compare and update manifest hash
-            if newly_calculated_hash and current_hash_in_manifest != newly_calculated_hash:
-                print(f"  New hash ({newly_calculated_hash}) for '{app_name}' differs from current manifest hash ({current_hash_in_manifest}). Updating hash...")
+            manifest_modified_by_hash_update = False # Renamed
+            if calculated_new_hash and hash_from_manifest != calculated_new_hash:
+                print(f"  New hash ({calculated_new_hash}) for '{app_name}' differs from current manifest hash ({hash_from_manifest}). Updating hash...")
                 
-                # Update hash in the manifest_data object
-                if hash_path_in_json == ["architecture", "64bit", "hash"]:
-                    manifest_data["architecture"]["64bit"]["hash"] = newly_calculated_hash
-                elif hash_path_in_json == ["hash"]:
-                    manifest_data["hash"] = newly_calculated_hash
-                else: # Should not happen if hash was found earlier
-                    print(f"  Warning: Could not determine where to update hash in manifest '{app_name}'.")
-                    processed_app_names.append(app_name)
-                    continue # Skip saving this manifest
+                target_obj = manifest_data_object
+                if json_hash_path_keys == ["architecture", "64bit", "hash"]:
+                    if "architecture" in target_obj and "64bit" in target_obj["architecture"]:
+                        target_obj["architecture"]["64bit"]["hash"] = calculated_new_hash
+                        manifest_modified_by_hash_update = True
+                elif json_hash_path_keys == ["hash"]:
+                    if "hash" in target_obj or hash_from_manifest is not None : # Ensure key exists or was placeholder
+                        target_obj["hash"] = calculated_new_hash
+                        manifest_modified_by_hash_update = True
+                
+                if not manifest_modified_by_hash_update: # If path was not matched, or key didn't exist as expected
+                     print(f"  Warning: Could not determine where to update hash in manifest '{app_name}'.")
 
-                try:
-                    with open(manifest_path, 'w', encoding='utf-8') as f: # Save as UTF-8 (no BOM by default)
-                        json.dump(manifest_data, f, indent=4, ensure_ascii=False)
-                    print(f"  Manifest file '{app_name}' was successfully updated with the new hash.")
-                    any_manifest_file_updated_in_run = True
-                except Exception as e:
-                    print(f"  Error saving updated manifest file '{app_name}': {e}")
-            elif newly_calculated_hash:
+            elif calculated_new_hash:
                 print(f"  Calculated hash for '{app_name}' is identical to the hash in the manifest. No hash update needed.")
             else:
                 print(f"  Hash for '{app_name}' was not updated due to previous download/calculation errors.")
+                any_file_changed_in_run = True # Mark as issue
 
-            processed_app_names.append(app_name)
+            if manifest_modified_by_hash_update:
+                 try:
+                    with open(manifest_path, 'w', encoding='utf-8') as f:
+                        json.dump(manifest_data_object, f, indent=4, ensure_ascii=False)
+                    print(f"  Manifest file '{app_name}' was successfully updated with the new hash.")
+                    any_file_changed_in_run = True
+                 except Exception as e:
+                    print(f"  Error saving updated manifest file '{app_name}': {e}")
+                    any_file_changed_in_run = True # Mark as issue
+            
+            processed_app_names_for_readme.append(app_name)
             print(f"Processing of manifest '{app_name}' finished.")
             print("---------------------------")
 
     # --- Update README.md ---
-    github_repo_env_var = os.environ.get("GITHUB_REPOSITORY")
-    user_display_bucket_name = "MyScoopBucket"
-    repo_full_address_for_readme = "YourUsername/YourRepoName"
+    repo_env_var_full_name = os.environ.get("GITHUB_REPOSITORY") # Renamed
+    bucket_name_for_readme_display = "MyScoopBucket" # Default
+    github_repo_address_for_readme = "YourUsername/YourRepoName" # Default
 
-    if github_repo_env_var:
-        parts = github_repo_env_var.split('/')
-        if len(parts) == 2:
-            repo_full_address_for_readme = github_repo_env_var
-            user_display_bucket_name = parts[1]
+    if repo_env_var_full_name:
+        repo_parts = repo_env_var_full_name.split('/') # Renamed
+        if len(repo_parts) == 2:
+            github_repo_address_for_readme = repo_env_var_full_name
+            bucket_name_for_readme_display = repo_parts[1]
     else:
         try:
-            git_remote_process = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=False, encoding='utf-8', errors='replace')
-            if git_remote_process.returncode == 0:
-                remote_url = git_remote_process.stdout.strip()
-                match = re.search(r'github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?$', remote_url)
-                if match:
-                    owner, repo_name = match.groups()
-                    repo_full_address_for_readme = f"{owner}/{repo_name}"
-                    user_display_bucket_name = repo_name
+            git_origin_url_process = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=False, encoding='utf-8', errors='replace') # Renamed
+            if git_origin_url_process.returncode == 0:
+                parsed_remote_url = git_origin_url_process.stdout.strip() # Renamed
+                url_match = re.search(r'github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?$', parsed_remote_url) # Renamed
+                if url_match:
+                    repo_owner, repo_actual_name = url_match.groups() # Renamed
+                    github_repo_address_for_readme = f"{repo_owner}/{repo_actual_name}"
+                    bucket_name_for_readme_display = repo_actual_name
                 else:
                     print("Warning: Could not parse GitHub repository name from git remote URL for README.")
             else:
@@ -275,13 +279,13 @@ def main():
         except Exception as e:
             print(f"Warning: Could not determine repository info from git for README: {e}. Using default README info.")
 
-    readme_was_changed = update_readme_file(readme_file_path, processed_app_names, user_display_bucket_name, repo_full_address_for_readme)
+    readme_file_was_changed = update_readme_file(readme_file_path, processed_app_names_for_readme, bucket_name_for_readme_display, github_repo_address_for_readme) # Renamed
 
     print("\n=========================================================")
-    if any_manifest_file_updated_in_run or readme_was_changed :
-        print("Update operation completed. Some files were modified.")
+    if any_file_changed_in_run or readme_file_was_changed :
+        print("Update operation completed. Some files may have been modified or errors occurred.")
     else:
-        print("Update operation for all manifests completed successfully (no changes were needed).")
+        print("Update operation for all manifests completed successfully (or no changes were needed).")
 
 if __name__ == "__main__":
     main()

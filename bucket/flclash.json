@@ -1,0 +1,45 @@
+{
+    "version": "0.8.84",
+    "description": "Yet another clash gui.",
+    "homepage": "https://github.com/chen08209/FlClash",
+    "license": "Apache-2.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/chen08209/FlClash/releases/download/v0.8.84/FlClash-0.8.84-windows-amd64-setup.exe",
+            "hash": ""
+        }
+    },
+    "installer": {
+        "script": [
+            "$processOptions = @{",
+            "    FilePath     = \"$dir\\$fname\"",
+            "    ArgumentList = @('/S', \"/D=`\"$dir`\"\")",
+            "    Wait         = $true",
+            "    PassThru     = $true",
+            "    Verb         = 'RunAs'",
+            "}",
+            "$process = Start-Process @processOptions",
+            "if ($process.ExitCode -ne 0) {",
+            "    error \"Installer exited with code: $($process.ExitCode)\"",
+            "    exit 1",
+            "}"
+        ]
+    },
+    "bin": "FlClash.exe",
+    "shortcuts": [
+        [
+            "FlClash.exe",
+            "FlClash"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/chen08209/FlClash"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/chen08209/FlClash/releases/download/v$version/FlClash-$version-windows-amd64-setup.exe"
+            }
+        }
+    }
+}
