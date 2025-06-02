@@ -1,4 +1,4 @@
-﻿{
+{
     "version": "1.9.7",
     "description": "A GUI for Clash Core, support Windows and Linux",
     "homepage": "https://github.com/GUI-for-Cores/GUI.for.Clash",
@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/GUI-for-Cores/GUI.for.Clash/releases/download/v1.9.7/GUI.for.Clash-windows-amd64.zip",
-            "hash": ""
+            "hash": "8e38b48c014c9b131ca0ddc951596b66bc9dd9e9792c78d1a774dd21e3605918"
         }
     },
     "bin": "GUI.for.Clash.exe",
