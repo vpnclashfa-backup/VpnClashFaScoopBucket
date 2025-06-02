@@ -18,8 +18,15 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Scoop using babochka/setup-scoop
-        uses: babochka/setup-scoop@v2.0.1 # Using specific version
+      - name: Check GitHub API access for action (Diagnostic)
+        shell: pwsh
+        run: |
+          Invoke-RestMethod -Uri "https://api.github.com/repos/babochka/setup-scoop/releases/tags/v2.0.1" | Select-Object name, tag_name, published_at | Format-List
+        continue-on-error: true # Continue even if this diagnostic step fails
+
+      - name: Setup Scoop using babochka/setup-scoop (with commit SHA)
+        # Using commit SHA for v2.0.1 to bypass potential tag resolution issues
+        uses: babochka/setup-scoop@9babf5750d1f10388009956310791750c618b2a0 
         id: setup_scoop
         # This action automatically adds Scoop to PATH
 
@@ -28,7 +35,6 @@ jobs:
         run: |
           Write-Host "Updating Scoop and core buckets..."
           scoop update scoop
-          # Attempt to remove and re-add to ensure freshness, ignore errors if already removed/added
           scoop bucket rm main -ErrorAction SilentlyContinue
           scoop bucket add main -ErrorAction SilentlyContinue
           scoop bucket rm extras -ErrorAction SilentlyContinue
@@ -46,20 +52,20 @@ jobs:
           Write-Host "PATH environment variable:"
           $env:PATH -split ';' | ForEach-Object { Write-Host "  $_" }
           Write-Host "Scoop Version:"
-          scoop.exe --version
+          scoop.exe --version -ErrorAction SilentlyContinue
           Write-Host "Scoop Help (check for checkver):"
-          scoop.exe help
-          scoop.exe help checkver # Specifically check help for checkver
+          scoop.exe help -ErrorAction SilentlyContinue
+          scoop.exe help checkver -ErrorAction SilentlyContinue
           Write-Host "Scoop Status:"
-          scoop.exe status
+          scoop.exe status -ErrorAction SilentlyContinue
           Write-Host "--- End Verification ---"
-        continue-on-error: true # Allow verification to proceed even if some commands have issues
+        continue-on-error: true
 
       - name: Run PowerShell Script to Update Manifest Versions & URLs
         id: update_versions_urls
         run: ./Update-ScoopVersions.ps1 -BucketPath "./bucket"
         shell: pwsh
-        continue-on-error: true # Python script will handle current state
+        continue-on-error: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
