@@ -10,7 +10,7 @@ jobs:
     runs-on: windows-latest
 
     permissions:
-      contents: write # Needed to commit changes back to the repository
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -18,13 +18,13 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Scoop, Update Buckets, and Run Update-ScoopVersions.ps1
+      - name: Install Scoop, Verify Module, Update Buckets, and Run Script
         id: scoop_operations
         shell: pwsh
         run: |
           Write-Host "Attempting to install Scoop manually..."
           Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-          $ErrorActionPreference = "Stop" 
+          $ErrorActionPreference = "Stop"
           try {
             Invoke-RestMethod -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
           } catch {
@@ -32,66 +32,72 @@ jobs:
             Write-Host "Trying with Invoke-WebRequest..."
             Invoke-WebRequest -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
           }
-          $ErrorActionPreference = "Continue" 
+          $ErrorActionPreference = "Continue"
 
           if (!(Test-Path scoop_installer.ps1)) {
-            Write-Error "Scoop installer script (scoop_installer.ps1) not found after download attempt."
+            Write-Error "Scoop installer script not found."
             exit 1
           }
 
-          Write-Host "Scoop installer downloaded. Running installer..."
-          $env:SCOOP = "$HOME\scoop" 
+          Write-Host "Running Scoop installer..."
+          $env:SCOOP = "$HOME\scoop"
           if (-not (Test-Path $env:SCOOP)) {
             New-Item -ItemType Directory -Path $env:SCOOP -Force | Out-Null
           }
           .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir $env:SCOOP
           Write-Host "Scoop installation script executed."
-          
+
           $ScoopShimsPath = Join-Path $env:SCOOP "shims"
+          $ScoopModulePath = Join-Path $env:SCOOP "apps\scoop\current\modules\scoop.psm1"
           Write-Host "Determined Scoop Shims Path: $ScoopShimsPath"
+          Write-Host "Expected Scoop Module Path: $ScoopModulePath"
+
+          # CRITICAL CHECK: Verify module existence immediately after install
+          if (Test-Path $ScoopModulePath -PathType Leaf) {
+            Write-Output "SUCCESS: Scoop module file FOUND at '$ScoopModulePath' immediately after install."
+          } else {
+            Write-Error "CRITICAL POST-INSTALL CHECK: Scoop module file NOT FOUND at '$ScoopModulePath'."
+            Write-Host "Listing contents of '$($env:SCOOP)\apps\scoop\current\modules\' (if it exists):"
+            Get-ChildItem (Join-Path $env:SCOOP "apps\scoop\current\modules") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
+            Write-Host "Listing contents of '$($env:SCOOP)\apps\scoop\current\':"
+            Get-ChildItem (Join-Path $env:SCOOP "apps\scoop\current") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
+            exit 1 # Fail fast if module is missing, as it's critical
+          }
           
           Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
-          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH (for potential future steps)."
-
+          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH."
           if ($env:PATH -notlike "*$ScoopShimsPath*") {
             $env:PATH = "$ScoopShimsPath;$env:PATH"
             Write-Host "Added '$ScoopShimsPath' to current session PATH."
           } else {
             Write-Host "'$ScoopShimsPath' was already in current session PATH."
           }
-          Write-Host "Current session PATH relevant part: $($env:PATH.Substring(0, [System.Math]::Min($env:PATH.Length, 200)))..."
 
-          Write-Host "Verifying Scoop installation immediately in this session (using 'scoop' command)..."
+          Write-Host "Verifying Scoop command (via shim in PATH)..."
           scoop --version
           scoop status
-          
           Remove-Item scoop_installer.ps1 -Force
-          Write-Host "Removed scoop_installer.ps1."
-
-          Write-Host "Listing contents of Scoop shims directory: $ScoopShimsPath (Confirming scoop.ps1 or scoop.cmd exists)"
-          Get-ChildItem -Path $ScoopShimsPath | ForEach-Object { Write-Host "  Found in shims: $($_.Name)" }
 
           Write-Host "Updating Scoop and core buckets..."
           scoop update scoop
-          scoop bucket rm main -ErrorAction SilentlyContinue 
+          scoop bucket rm main -ErrorAction SilentlyContinue
           scoop bucket add main
-          scoop bucket rm extras -ErrorAction SilentlyContinue 
+          scoop bucket rm extras -ErrorAction SilentlyContinue
           scoop bucket add extras
-          scoop update 
+          scoop update
           Write-Host "Scoop and core buckets update process finished."
 
           $ScriptPath = "./Update-ScoopVersions.ps1"
           Write-Host "Running PowerShell Script: $ScriptPath with Shims Path parameter '$ScoopShimsPath'"
           if (!(Test-Path $ScriptPath)) {
-            Write-Error "Update-ScoopVersions.ps1 not found at $ScriptPath"
+            Write-Error "$ScriptPath not found"
             exit 1
           }
-          # Pass the determined $ScoopShimsPath to the script
+          # The script Update-ScoopVersions.ps1 (v9_module_focus) will now use this path to find the module
           & $ScriptPath -BucketPath "./bucket" -ProvidedScoopShimsPath $ScoopShimsPath
           if ($LASTEXITCODE -ne 0) {
             Write-Warning "Update-ScoopVersions.ps1 script finished with exit code $LASTEXITCODE."
-            # Optionally, exit 1 here if script failure should fail the job
-            # exit 1 
+            # exit 1 # Optionally fail the job
           } else {
             Write-Host "Update-ScoopVersions.ps1 script finished successfully."
           }
@@ -117,13 +123,11 @@ jobs:
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          echo "--- Git Status Before Add ---"
           git status
           git add bucket/*.json README.md
-          echo "--- Git Status After Add (Before Commit) ---"
           git status
           if ! git diff --cached --quiet; then
-            echo "Changes detected and staged, committing and pushing..."
+            echo "Changes detected, committing..."
             git commit -m "Automated: Update app manifests, hashes, and README"
             git push
           else
