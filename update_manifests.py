@@ -3,20 +3,19 @@ import os
 import json
 import hashlib
 import subprocess
-import requests # External library, needs to be installed (e.g., pip install requests)
+import requests 
 from pathlib import Path
-import re # For parsing git remote URL
+import re 
 
 # --- Configuration ---
-BUCKET_SUBDIRECTORY = "bucket"  # Subdirectory containing .json manifest files
-README_FILE_NAME = "README.md" # Name of your README file
+BUCKET_SUBDIRECTORY = "bucket"
+README_FILE_NAME = "README.md"
 APP_LIST_START_PLACEHOLDER = ""
 APP_LIST_END_PLACEHOLDER = ""
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-REQUEST_TIMEOUT_SECONDS = 300 # Timeout for downloading files
+REQUEST_TIMEOUT_SECONDS = 300
 
 def calculate_sha256_hash(file_path: Path) -> str | None:
-    """Calculates the SHA256 hash of a file."""
     sha256_hash_obj = hashlib.sha256()
     try:
         with open(file_path, 'rb') as f:
@@ -28,7 +27,6 @@ def calculate_sha256_hash(file_path: Path) -> str | None:
         return None
 
 def download_file_from_url(url: str, destination_path: Path) -> bool:
-    """Downloads a file from a URL to a destination path."""
     print(f"    Downloading from: {url}")
     print(f"    Saving to temporary file: {destination_path.name}")
     try:
@@ -47,42 +45,51 @@ def download_file_from_url(url: str, destination_path: Path) -> bool:
         print(f"    An unexpected error occurred during download from '{url}': {e}")
         return False
 
-def update_readme_file( 
+def update_readme_file(
     readme_file_path_param: Path,
     list_of_app_names_param: list[str],
-    bucket_name_for_display_param: str,
-    github_repo_address_param: str
+    bucket_name_for_display_param: str, # This should be 'VpnClashFa' as per user's request
+    github_repo_address_param: str    # This should be 'vpnclashfa-backup/VpnClashFaScoopBucket'
 ) -> bool:
-    """Updates the README.md file with the list of applications and usage instructions."""
     print(f"\nAttempting to update README.md at: {readme_file_path_param}")
     repo_url_for_readme_text = f"https://github.com/{github_repo_address_param}.git"
     readme_was_modified_flag = False
 
     if not readme_file_path_param.exists():
-        print(f"Warning: README.md not found at '{readme_file_path_param}'. Creating a sample README.md.")
-        default_readme_generated_content = f"""# مخزن Scoop: {bucket_name_for_display_param}
+        print(f"README.md not found at '{readme_file_path_param}'. Creating a sample README.md.")
+        # Using the user's preferred bucket name and structure for auto-generation
+        default_readme_generated_content = f"""# مخزن Scoop شخصی {bucket_name_for_display_param}
 
-این یک مخزن شخصی برای نصب و مدیریت آسان نرم‌افزارها با استفاده از Scoop است.
+به مخزن شخصی من برای نرم‌افزارهای Scoop خوش آمدید!
+در اینجا مجموعه‌ای از مانیفست‌ها برای نصب آسان نرم‌افزارهای کاربردی، به خصوص ابزارهای مرتبط با شبکه و حریم خصوصی، قرار دارد. این مخزن به طور خودکار با استفاده از GitHub Actions به‌روزرسانی می‌شود.
 
 ## scoop
 
-برای اضافه کردن این مخزن به Scoop و نصب برنامه‌ها، دستورات زیر را در PowerShell اجرا کنید:
+برای اضافه کردن این مخزن (Bucket) به Scoop خود و استفاده از نرم‌افزارهای آن، دستور زیر را در PowerShell اجرا کنید:
 
 ```powershell
 scoop bucket add {bucket_name_for_display_param} {repo_url_for_readme_text}
 scoop install {bucket_name_for_display_param}/<program-name>
 ```
 
-## Packages
+پس از اضافه کردن مخزن، برای نصب یک نرم‌افزار از لیست زیر، از دستور `scoop install <نام_نرم‌افزار>` استفاده کنید. به عنوان مثال:
 
+```powershell
+scoop install {bucket_name_for_display_param}/clash-verge-rev
+```
+
+می‌توانید وضعیت و تاریخچه به‌روزرسانی‌های خودکار این مخزن را در صفحه Actions ما مشاهده کنید:
+[صفحه وضعیت Actions](https://github.com/{github_repo_address_param}/actions)
+
+## Packages
 ```text
 {APP_LIST_START_PLACEHOLDER}
-(این لیست به طور خودکار توسط اسکریپت به‌روزرسانی خواهد شد)
+(این لیست به طور خودکار توسط اسکریپت پایتون به‌روزرسانی خواهد شد. اگر این پیام را می‌بینید، یعنی اکشن هنوز اجرا نشده یا مشکلی در شناسایی پلیس‌هولدرها وجود داشته است.)
 {APP_LIST_END_PLACEHOLDER}
 ```
 ---
-می‌توانید وضعیت به‌روزرسانی‌های خودکار این مخزن را در صفحه Actions مشاهده کنید:
-[صفحه وضعیت Actions](https://github.com/{github_repo_address_param}/actions)
+
+اگر پیشنهاد یا مشکلی در مورد این مخزن دارید، لطفاً یک Issue جدید در صفحه گیت‌هاب این ریپازیتوری باز کنید.
 """
         try:
             readme_file_path_param.write_text(default_readme_generated_content, encoding='utf-8')
@@ -138,7 +145,7 @@ scoop install {bucket_name_for_display_param}/<program-name>
                 print("README.md application list is already up-to-date.")
         else:
             print(f"Warning: Placeholders '{start_placeholder_tag_text}' and/or '{end_placeholder_tag_text}' not found in README.md.")
-            print("The application list was not updated. Please add the placeholders to your README.md file.")
+            print("The application list was not updated. Please add the placeholders to your README.md file (inside the ```text block under ## Packages).")
     else:
          print(f"Warning: README.md content is not available for placeholder processing (it might be empty or unreadable).")
     
@@ -172,9 +179,13 @@ def main():
             
             print(f"Running 'scoop checkver \"{name_of_app}\" -u'...")
             try:
-                # PowerShell command to run. -NoProfile was removed.
-                ps_command_for_checkver = f"$ProgressPreference = 'SilentlyContinue'; scoop checkver '{name_of_app}' -u"
-                scoop_checkver_command_line_args = ["pwsh", "-Command", ps_command_for_checkver.strip()] # Removed -NoProfile
+                # Attempt to make scoop command available in the PowerShell session
+                ps_command_for_checkver = f"""
+                $ProgressPreference = 'SilentlyContinue'
+                scoop checkver '{name_of_app}' -u
+                """
+                # Use -Command for complex commands, remove -NoProfile to allow environment setup
+                scoop_checkver_command_line_args = ["pwsh", "-Command", ps_command_for_checkver.strip()]
                 
                 scoop_checkver_execution_result = subprocess.run( 
                     scoop_checkver_command_line_args, capture_output=True, text=True, check=False, encoding='utf-8', errors='replace'
@@ -188,9 +199,11 @@ def main():
                     if scoop_checkver_execution_result.stdout and scoop_checkver_execution_result.stdout.strip(): print(f"    Scoop Checkver Output:\n{scoop_checkver_execution_result.stdout.strip()}")
             except FileNotFoundError:
                 print("  Error: 'pwsh' (PowerShell) not found. Cannot run 'scoop checkver'.")
+                # This would be a fatal error for the script's purpose if checkver is essential.
             except Exception as e:
                 print(f"  Warning: Error during execution of 'scoop checkver \"{name_of_app}\" -u': {e}")
 
+            # Continue to hash check even if checkver had issues, using current manifest data
             try:
                 with open(single_manifest_file, 'r', encoding='utf-8-sig') as f: 
                     manifest_data_as_object = json.load(f)
@@ -212,38 +225,34 @@ def main():
             
             if not app_download_link:
                 print(f"  Warning: 'url' field not found or empty in manifest '{name_of_app}'. Skipping hash update.")
-                list_of_processed_app_names.append(name_of_app)
+                list_of_processed_app_names.append(name_of_app) # Add to list even if URL is missing, for completeness in README
                 continue
             
             print(f"  Download URL found: {app_download_link}")
             print(f"  Current hash in manifest: {hash_value_from_json}")
 
-            temp_download_dir_path = repository_root_directory / "temp_scoop_downloads_python_final_v3" 
-            temp_download_dir_path.mkdir(exist_ok=True)
+            temp_download_directory = repository_root_directory / "temp_scoop_downloads_python_final_v_action" 
+            temp_download_directory.mkdir(exist_ok=True)
             original_filename_from_url = os.path.basename(app_download_link.split('?')[0]) 
             sanitized_temporary_filename = "".join(c if c.isalnum() or c in ['.', '-', '_'] else '_' for c in original_filename_from_url) 
-            if not sanitized_temporary_filename: sanitized_temporary_filename = "downloaded_asset_file_default_name" 
-            full_path_to_temporary_downloaded_file = temp_download_dir_path / f"{name_of_app}_{sanitized_temporary_filename}.tmp" 
+            if not sanitized_temporary_filename: sanitized_temporary_filename = "downloaded_asset_default_name" 
+            full_path_to_temporary_downloaded_file = temp_download_directory / f"{name_of_app}_{sanitized_temporary_filename}.tmp" 
 
-            download_operation_was_successful = download_file_from_url(app_download_link, full_path_to_temporary_downloaded_file) 
+            download_was_ok = download_file_from_url(app_download_link, full_path_to_temporary_downloaded_file) 
             newly_calculated_file_hash = None 
 
-            if download_operation_was_successful:
+            if download_was_ok:
                 newly_calculated_file_hash = calculate_sha256_hash(full_path_to_temporary_downloaded_file)
                 if newly_calculated_file_hash:
                     print(f"  New calculated hash for '{name_of_app}': {newly_calculated_file_hash}")
             
             if full_path_to_temporary_downloaded_file.exists():
-                try:
-                    os.remove(full_path_to_temporary_downloaded_file)
-                except Exception as e_rm_temp:
-                    print(f"    Warning: Could not remove temporary file {full_path_to_temporary_downloaded_file}: {e_rm_temp}")
+                try: os.remove(full_path_to_temporary_downloaded_file)
+                except Exception as e_rm_temp: print(f"    Warning: Could not remove temporary file {full_path_to_temporary_downloaded_file}: {e_rm_temp}")
             
-            if temp_download_dir_path.exists() and not any(temp_download_dir_path.iterdir()): # Remove if empty
-                 try:
-                     temp_download_dir_path.rmdir()
-                 except Exception as e_rm_dir:
-                     print(f"    Warning: Could not remove temporary directory {temp_download_dir_path}: {e_rm_dir}")
+            if temp_download_directory.exists() and not any(temp_download_directory.iterdir()):
+                 try: temp_download_directory.rmdir()
+                 except Exception as e_rm_dir: print(f"    Warning: Could not remove temporary directory {temp_download_directory}: {e_rm_dir}")
 
             manifest_file_updated_due_to_hash = False 
             if newly_calculated_file_hash and hash_value_from_json != newly_calculated_file_hash:
@@ -255,7 +264,7 @@ def main():
                         target_dictionary_to_update["architecture"]["64bit"]["hash"] = newly_calculated_file_hash
                         manifest_file_updated_due_to_hash = True
                 elif keys_to_reach_hash_in_json == ["hash"]:
-                    if "hash" in target_dictionary_to_update or hash_value_from_json is not None :
+                    if "hash" in target_dictionary_to_update or hash_value_from_json is not None : # Check if key exists OR if it was a placeholder meant to be updated
                         target_dictionary_to_update["hash"] = newly_calculated_file_hash
                         manifest_file_updated_due_to_hash = True
                 
@@ -283,41 +292,41 @@ def main():
             print("---------------------------")
 
     # --- Update README.md ---
-    github_repo_full_name_from_env = os.environ.get("GITHUB_REPOSITORY") 
-    user_preferred_bucket_name_for_readme = "VpnClashFa" 
-    actual_repo_address_for_readme = "vpnclashfa-backup/VpnClashFaScoopBucket" 
+    # Determine bucket name and repo address for README based on GitHub Actions environment or local git config
+    github_repository_env_variable_value = os.environ.get("GITHUB_REPOSITORY") 
+    bucket_name_to_display_in_readme = "VpnClashFa" # User's preferred bucket name for 'scoop bucket add'
+    repo_address_for_readme_file = "vpnclashfa-backup/VpnClashFaScoopBucket" # User's actual repo path
 
-    if github_repo_full_name_from_env: 
-        repo_name_parts_from_github_env = github_repo_full_name_from_env.split('/') 
-        if len(repo_name_parts_from_github_env) == 2:
-            actual_repo_address_for_readme = github_repo_full_name_from_env
-            # Keep user_preferred_bucket_name_for_readme as VpnClashFa, as requested
-    else: 
+    if github_repository_env_variable_value: 
+        # GITHUB_REPOSITORY is in 'owner/repo' format
+        repo_address_for_readme_file = github_repository_env_variable_value
+        # We will still use the user's preferred bucket name 'VpnClashFa' for display
+    else: # If script is run locally, try to get from git remote
         try:
-            git_remote_origin_url_process_result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=False, encoding='utf-8', errors='replace') 
-            if git_remote_origin_url_process_result.returncode == 0:
-                git_remote_origin_url_as_string = git_remote_origin_url_process_result.stdout.strip() 
-                url_regex_match_result_object = re.search(r'github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?$', git_remote_origin_url_as_string) 
-                if url_regex_match_result_object:
-                    git_repository_owner, git_repository_name = url_regex_match_result_object.groups() 
-                    actual_repo_address_for_readme = f"{git_repository_owner}/{git_repository_name}"
-                    # Keep user_preferred_bucket_name_for_readme as VpnClashFa
+            git_origin_url_command_output = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=False, encoding='utf-8', errors='replace') 
+            if git_origin_url_command_output.returncode == 0:
+                git_origin_url_string_value = git_origin_url_command_output.stdout.strip() 
+                url_regex_match_object = re.search(r'github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?$', git_origin_url_string_value) 
+                if url_regex_match_object:
+                    git_repository_owner, git_repository_name = url_regex_match_object.groups() 
+                    repo_address_for_readme_file = f"{git_repository_owner}/{git_repository_name}"
+                    # Keep VpnClashFa as the display name if preferred, otherwise could use git_repository_name
                 else:
-                    print("Warning: Could not parse GitHub repository name from git remote URL for README.")
+                    print("Warning: Could not parse GitHub repository name from git remote URL for README. Using defaults.")
             else:
                 print("Warning: 'git remote get-url origin' failed. Using default README info.")
         except Exception as e:
             print(f"Warning: Could not determine repository info from git for README: {e}. Using default README info.")
 
-    readme_was_modified_by_script = update_readme_file( 
+    readme_file_was_actually_modified = update_readme_file( 
         readme_file_full_path, 
         list_of_processed_app_names, 
-        user_preferred_bucket_name_for_readme, 
-        actual_repo_address_for_readme
+        bucket_name_to_display_in_readme, 
+        repo_address_for_readme_file
     )
 
     print("\n=========================================================")
-    if any_file_actually_changed_in_run or readme_was_modified_by_script :
+    if any_file_actually_changed_in_run or readme_file_was_actually_modified :
         print("Update operation completed. Some files may have been modified or errors occurred.")
     else:
         print("Update operation for all manifests completed successfully (or no changes were needed).")
