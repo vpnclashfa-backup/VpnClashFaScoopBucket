@@ -1,4 +1,4 @@
-name: Update Scoop Bucket (Manual Scoop Clone - Recurse Submodules)
+name: Update Scoop Bucket (Manual Scoop Clone - Staged Submodule Init)
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -18,19 +18,19 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Manually Clone Scoop Source Code (Full Master Branch with Submodules)
+      - name: Manually Clone Scoop Source Code (Main Repo First)
         shell: pwsh
         run: |
-          Write-Host "Attempting to manually clone ScoopInstaller/Scoop (master branch, full clone with submodules)..."
+          Write-Host "Attempting to manually clone ScoopInstaller/Scoop (master branch, main repo only first)..."
           $ScoopSourcePath = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
           if (Test-Path $ScoopSourcePath) {
             Write-Host "Removing existing directory: $ScoopSourcePath"
             Remove-Item -Recurse -Force $ScoopSourcePath
           }
-          # Clone the master branch specifically, and recurse submodules
-          git clone --branch master --recurse-submodules https://github.com/ScoopInstaller/Scoop.git $ScoopSourcePath
+          # Clone the master branch specifically, WITHOUT recursing submodules initially
+          git clone --branch master https://github.com/ScoopInstaller/Scoop.git $ScoopSourcePath
           
-          Write-Host "Scoop source code (master branch with submodules) cloned to $ScoopSourcePath"
+          Write-Host "Scoop source code (master branch, main repo) cloned to $ScoopSourcePath"
           if (!(Test-Path $ScoopSourcePath)) {
             Write-Error "CRITICAL FAILURE: Scoop source directory not found after git clone."
             exit 1
@@ -39,37 +39,73 @@ jobs:
             Write-Error "CRITICAL FAILURE: .git directory not found in $ScoopSourcePath. Clone might have failed."
             exit 1
           }
-          Write-Host "Successfully cloned Scoop and .git directory exists."
+          Write-Host "Successfully cloned Scoop main repository and .git directory exists."
 
-      - name: Diagnostic File Listing for Scoop Source Checkout
-        id: diagnostic_listing
+      - name: Diagnostic File Listing for Scoop Source Checkout (After Main Clone)
+        id: diagnostic_listing_main
         shell: pwsh
         run: |
           $ScoopSourceDir = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
-          Write-Host "--- Diagnostic: Listing Scoop Source Checkout at '$ScoopSourceDir' ---"
-          
+          Write-Host "--- Diagnostic (After Main Clone): Listing Scoop Source Checkout at '$ScoopSourceDir' ---"
           if (!(Test-Path $ScoopSourceDir -PathType Container)) {
             Write-Error "FAILURE (Diagnostic): Scoop source directory '$ScoopSourceDir' does not exist."
             exit 1
           }
-          Write-Host "Top-level contents of '$ScoopSourceDir' (Force enumeration):"
+          Write-Host "Top-level contents of '$ScoopSourceDir':"
           Get-ChildItem -Path $ScoopSourceDir -Depth 0 -Force | ForEach-Object { Write-Output "  L0: $($_.Name) (Mode: $($_.Mode))" }
           
           $ScoopModulesDir = Join-Path $ScoopSourceDir "modules"
           Write-Host "Checking existence of '$ScoopModulesDir': $(Test-Path $ScoopModulesDir -PathType Container)"
-          Write-Host "Contents of '$ScoopModulesDir' (if it exists, Force enumeration):"
-          Get-ChildItem -Path $ScoopModulesDir -ErrorAction SilentlyContinue -Force | ForEach-Object { Write-Output "  L1-Modules: $($_.Name) (Mode: $($_.Mode), Length: $($_.Length))" }
-          
-          $ExpectedModuleFile = Join-Path $ScoopModulesDir "scoop.psm1"
-          Write-Host "Checking existence of '$ExpectedModuleFile': $(Test-Path $ExpectedModuleFile -PathType Leaf)"
-          if (Test-Path $ExpectedModuleFile -PathType Leaf) {
-            Write-Host "SUCCESS (Diagnostic): '$ExpectedModuleFile' exists."
+          if (Test-Path $ScoopModulesDir -PathType Container) {
+            Write-Host "Contents of '$ScoopModulesDir':"
+            Get-ChildItem -Path $ScoopModulesDir -ErrorAction SilentlyContinue -Force | ForEach-Object { Write-Output "  L1-Modules: $($_.Name) (Mode: $($_.Mode), Length: $($_.Length))" }
+            $ExpectedModuleFile = Join-Path $ScoopModulesDir "scoop.psm1"
+            Write-Host "Checking existence of '$ExpectedModuleFile': $(Test-Path $ExpectedModuleFile -PathType Leaf)"
+            if (Test-Path $ExpectedModuleFile -PathType Leaf) {
+              Write-Host "SUCCESS (Diagnostic): '$ExpectedModuleFile' exists after main clone."
+            } else {
+              Write-Error "FAILURE (Diagnostic): '$ExpectedModuleFile' does NOT exist after main clone."
+            }
           } else {
-            Write-Error "FAILURE (Diagnostic): '$ExpectedModuleFile' does NOT exist."
-            Write-Host "Deeper listing of '$ScoopSourceDir' (first 2 levels, Force enumeration):"
-            Get-ChildItem -Path $ScoopSourceDir -Recurse -Depth 1 -Force -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.FullName.Replace($env:GITHUB_WORKSPACE, '')) (Mode: $($_.Mode))" }
+            Write-Error "FAILURE (Diagnostic): Directory '$ScoopModulesDir' does NOT exist after main clone."
           }
-          Write-Host "--- End Diagnostic ---"
+          Write-Host "--- End Diagnostic (After Main Clone) ---"
+
+      - name: Initialize and Update Submodules
+        shell: pwsh
+        working-directory: ${{ github.workspace }}/scoop_source_checkout # Run git commands from within the cloned repo
+        run: |
+          Write-Host "Attempting to initialize and update submodules..."
+          git submodule update --init --recursive
+          Write-Host "Submodule update process finished."
+          # Add a small delay in case of filesystem lag, though unlikely to be the issue
+          Start-Sleep -Seconds 5
+
+      - name: Diagnostic File Listing for Scoop Source Checkout (After Submodule Update)
+        id: diagnostic_listing_submodules
+        shell: pwsh
+        run: |
+          $ScoopSourceDir = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
+          Write-Host "--- Diagnostic (After Submodule Update): Listing Scoop Source Checkout at '$ScoopSourceDir' ---"
+          if (!(Test-Path $ScoopSourceDir -PathType Container)) {
+            Write-Error "FAILURE (Diagnostic): Scoop source directory '$ScoopSourceDir' does not exist."
+            exit 1
+          }
+          $ScoopModulesDir = Join-Path $ScoopSourceDir "modules"
+          Write-Host "Checking existence of '$ScoopModulesDir': $(Test-Path $ScoopModulesDir -PathType Container)"
+          if (Test-Path $ScoopModulesDir -PathType Container) {
+            $ExpectedModuleFile = Join-Path $ScoopModulesDir "scoop.psm1"
+            Write-Host "Checking existence of '$ExpectedModuleFile' again: $(Test-Path $ExpectedModuleFile -PathType Leaf)"
+            if (Test-Path $ExpectedModuleFile -PathType Leaf) {
+              Write-Host "SUCCESS (Diagnostic): '$ExpectedModuleFile' still exists after submodule update."
+            } else {
+              Write-Error "FAILURE (Diagnostic): '$ExpectedModuleFile' MISSING after submodule update (or was missing before)."
+            }
+          } else {
+             Write-Error "FAILURE (Diagnostic): Directory '$ScoopModulesDir' MISSING after submodule update (or was missing before)."
+          }
+          Write-Host "--- End Diagnostic (After Submodule Update) ---"
+
 
       - name: Set up Scoop Environment and Run Update-ScoopVersions.ps1
         id: scoop_operations
