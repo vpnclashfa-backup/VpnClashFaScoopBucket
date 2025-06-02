@@ -1,57 +1,64 @@
-﻿name: Update Scoop Manifests and README (Python)
+name: Update Scoop Manifests and README (Python)
 
 on:
-  workflow_dispatch: # به شما اجازه می‌ده اکشن رو به صورت دستی از طریق تب Actions در گیت‌هاب اجرا کنید
+  workflow_dispatch: # Allows manual triggering from the Actions tab
   schedule:
-    - cron: '30 16 * * *' # هر روز ساعت 16:30 UTC (حدوداً ۸ شب به وقت تهران)
+    - cron: '30 16 * * *' # Runs daily at 16:30 UTC (approximately 8:00 PM Tehran time)
 
 jobs:
   update_manifests:
-    runs-on: windows-latest # ماشین مجازی ویندوزی
+    runs-on: windows-latest # Run on a Windows virtual machine
 
+    # Grant permissions for the GITHUB_TOKEN to commit and push changes
     permissions:
-      contents: write # اجازه نوشتن برای کامیت و پوش کردن تغییرات
+      contents: write
 
     steps:
-      - name: Checkout Repository # قدم ۱: دانلود کد مخزن شما
+      - name: Checkout Repository # Step 1: Check out your repository's code
         uses: actions/checkout@v4
         with:
+          # Using GITHUB_TOKEN for operations like push.
+          # This token is automatically provided by GitHub.
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Scoop # قدم ۲: نصب و آماده‌سازی Scoop
+      - name: Setup Scoop # Step 2: Install and prepare Scoop
         uses: MinoruSekine/setup-scoop@v1
-        # پارامتر scoop_branch دیگر پشتیبانی نمی‌شود و حذف شده است
+        # The 'scoop_branch' input is no longer needed for this action
 
-      - name: Set up Python # قدم ۳: نصب پایتون
+      - name: Set up Python # Step 3: Install a specific version of Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.10' # Or any other Python 3.x version you prefer
 
-      - name: Install Python dependencies # قدم ۴: نصب کتابخانه‌های پایتون
+      - name: Install Python dependencies # Step 4: Install Python libraries needed by your script
         run: |
           python -m pip install --upgrade pip
-          pip install requests
-        shell: pwsh
+          pip install requests # 'requests' library is used for downloading files in the Python script
+        shell: pwsh # Run these commands using PowerShell
 
-      - name: Run Python script to update manifests # قدم ۵: اجرای اسکریپت پایتون شما
-        id: run_update_script
+      - name: Run Python script to update manifests # Step 5: Execute your Python script
+        id: run_update_script # An optional ID for this step
         env:
-          PYTHONIOENCODING: UTF-8 # <--- این خط برای حل مشکل انکودینگ در خروجی پایتون اضافه شده
-          GITHUB_REPOSITORY: ${{ github.repository }} # برای دسترسی اسکریپت به نام ریپازیتوری
-        run: python update_manifests.py # فرض بر این است که اسکریپت در ریشه ریپازیتوری قرار دارد
+          PYTHONIOENCODING: UTF-8 # Ensures Python uses UTF-8 for its standard input/output
+          GITHUB_REPOSITORY: ${{ github.repository }} # Makes the repository name available to your script
+        run: python update_manifests.py # Assumes your script is in the root of the repository
         shell: pwsh
 
-      - name: Commit and Push Changes # قدم ۶: کامیت و پوش کردن تغییرات
+      - name: Commit and Push Changes # Step 6: Commit and push any changes made by the script
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Check if there are any changes to commit
+          # `git diff --quiet HEAD` exits with 1 if there are uncommitted changes, 0 otherwise.
           if ! git diff --quiet HEAD; then
             echo "Changes detected, committing and pushing..."
+            # Add all .json files in the bucket directory and the README.md
+            # This ensures only expected files are committed.
             git add bucket/*.json README.md 
             git commit -m "Automated: Update app manifests and README (Python)"
             git push
           else
             echo "No changes to commit."
           fi
-        shell: bash
+        shell: bash # Git commands are often more conveniently run in a bash shell in actions
