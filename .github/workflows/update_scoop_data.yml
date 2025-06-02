@@ -51,7 +51,7 @@ jobs:
           Write-Host "Determined Scoop Shims Path: $ScoopShimsPath"
           
           Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
-          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH."
+          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH (for potential future steps)."
 
           if ($env:PATH -notlike "*$ScoopShimsPath*") {
             $env:PATH = "$ScoopShimsPath;$env:PATH"
@@ -59,16 +59,16 @@ jobs:
           } else {
             Write-Host "'$ScoopShimsPath' was already in current session PATH."
           }
-          Write-Host "Current session PATH (first 200 chars): $($env:PATH.Substring(0, [System.Math]::Min($env:PATH.Length, 200)))..."
+          Write-Host "Current session PATH relevant part: $($env:PATH.Substring(0, [System.Math]::Min($env:PATH.Length, 200)))..."
 
-          Write-Host "Verifying Scoop installation immediately in this session..."
+          Write-Host "Verifying Scoop installation immediately in this session (using 'scoop' command)..."
           scoop --version
           scoop status
           
           Remove-Item scoop_installer.ps1 -Force
           Write-Host "Removed scoop_installer.ps1."
 
-          Write-Host "Listing contents of Scoop shims directory: $ScoopShimsPath"
+          Write-Host "Listing contents of Scoop shims directory: $ScoopShimsPath (Confirming scoop.ps1 or scoop.cmd exists)"
           Get-ChildItem -Path $ScoopShimsPath | ForEach-Object { Write-Host "  Found in shims: $($_.Name)" }
 
           Write-Host "Updating Scoop and core buckets..."
@@ -81,14 +81,17 @@ jobs:
           Write-Host "Scoop and core buckets update process finished."
 
           $ScriptPath = "./Update-ScoopVersions.ps1"
-          Write-Host "Running PowerShell Script: $ScriptPath with Shims Path parameter"
+          Write-Host "Running PowerShell Script: $ScriptPath with Shims Path parameter '$ScoopShimsPath'"
           if (!(Test-Path $ScriptPath)) {
             Write-Error "Update-ScoopVersions.ps1 not found at $ScriptPath"
             exit 1
           }
+          # Pass the determined $ScoopShimsPath to the script
           & $ScriptPath -BucketPath "./bucket" -ProvidedScoopShimsPath $ScoopShimsPath
           if ($LASTEXITCODE -ne 0) {
             Write-Warning "Update-ScoopVersions.ps1 script finished with exit code $LASTEXITCODE."
+            # Optionally, exit 1 here if script failure should fail the job
+            # exit 1 
           } else {
             Write-Host "Update-ScoopVersions.ps1 script finished successfully."
           }
