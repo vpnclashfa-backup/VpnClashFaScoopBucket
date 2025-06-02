@@ -18,35 +18,48 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Scoop Manually
+      - name: Install Scoop Manually and Verify
         shell: pwsh
         run: |
           Write-Host "Attempting to install Scoop manually..."
           Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          $ErrorActionPreference = "Stop" # Stop on first error for this block
           try {
             Invoke-RestMethod -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
           } catch {
-            Write-Error "Failed to download Scoop installer script. Error: $($_.Exception.Message)"
-            # Fallback to iwr if Invoke-RestMethod fails (less common for this URL)
+            Write-Warning "Invoke-RestMethod failed. Error: $($_.Exception.Message)"
             Write-Host "Trying with Invoke-WebRequest..."
             Invoke-WebRequest -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
           }
-          
+          $ErrorActionPreference = "Continue" # Reset error action preference
+
           if (Test-Path scoop_installer.ps1) {
             Write-Host "Scoop installer downloaded. Running installer..."
-            # Install to default location: C:\Users\<user>\scoop
-            # The -RunSelfUpdate switch ensures Scoop updates itself immediately after installation.
-            .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir "$HOME\scoop"
+            # Install to default location and run self-update
+            # Explicitly set SCOOP env var as installer might not set it for current session immediately
+            $env:SCOOP = "$HOME\scoop" 
+            .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir $env:SCOOP
             Write-Host "Scoop installation script executed."
             
+            $ScoopShimsPath = Join-Path $env:SCOOP "shims"
+            
             # Add Scoop shims to GITHUB_PATH for subsequent steps in this job
-            $ScoopShimsPath = "$HOME\scoop\shims"
             Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
-            Write-Host "Added $ScoopShimsPath to GITHUB_PATH."
+            Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH."
 
-            # Also add to current session's PATH for immediate use in subsequent run blocks if needed
+            # Also add to current session's PATH for immediate use
             $env:PATH = "$ScoopShimsPath;$env:PATH"
-            Write-Host "Added $ScoopShimsPath to current session PATH."
+            Write-Host "Added '$ScoopShimsPath' to current session PATH."
+            Write-Host "Updated PATH: $env:PATH"
+
+            # Verify Scoop immediately
+            Write-Host "Verifying Scoop installation immediately..."
+            scoop --version
+            scoop status
+            
+            # Clean up installer script
+            Remove-Item scoop_installer.ps1 -Force
+            Write-Host "Removed scoop_installer.ps1."
 
           } else {
             Write-Error "Scoop installer script (scoop_installer.ps1) not found after download attempt."
@@ -57,43 +70,32 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Updating Scoop and core buckets..."
+          # These commands should now work if Scoop PATH is correctly set from previous step
           scoop update scoop
-          scoop bucket rm main -ErrorAction SilentlyContinue
-          scoop bucket add main -ErrorAction SilentlyContinue
-          scoop bucket rm extras -ErrorAction SilentlyContinue
-          scoop bucket add extras -ErrorAction SilentlyContinue
-          scoop update # Update all buckets
-        continue-on-error: true
+          scoop bucket rm main # No -ErrorAction needed here due to continue-on-error for step
+          scoop bucket add main
+          scoop bucket rm extras
+          scoop bucket add extras
+          scoop update
+        continue-on-error: true # Allows the workflow to continue even if bucket operations fail
 
-      - name: Verify Scoop installation and checkver command
+      - name: Verify Scoop installation and checkver command (again for clarity)
         shell: pwsh
         run: |
-          Write-Host "--- Verifying Scoop Installation ---"
+          Write-Host "--- Verifying Scoop Installation (Post-Bucket Update) ---"
           $ScoopExe = Get-Command scoop.exe -ErrorAction SilentlyContinue
           if ($ScoopExe) {
             Write-Host "Scoop executable path (from Get-Command): $($ScoopExe.Source)"
+            Write-Host "Scoop Version:"
+            scoop.exe --version
+            Write-Host "Scoop Help (check for checkver):"
+            scoop.exe help checkver
+            Write-Host "Scoop Status:"
+            scoop.exe status
           } else {
-            Write-Warning "scoop.exe not found via Get-Command."
+            Write-Warning "scoop.exe still not found via Get-Command at this stage."
+            Write-Host "Current PATH: $env:PATH"
           }
-          
-          $ExpectedScoopShimsPath = "$HOME\scoop\shims"
-          Write-Host "Expected Scoop Shims Path: $ExpectedScoopShimsPath"
-          if (Test-Path $ExpectedScoopShimsPath) {
-            Write-Host "Expected shims path exists."
-          } else {
-            Write-Warning "Expected shims path DOES NOT exist."
-          }
-
-          Write-Host "PATH environment variable:"
-          $env:PATH -split ';' | ForEach-Object { Write-Host "  $_" }
-          
-          Write-Host "Scoop Version:"
-          scoop.exe --version -ErrorAction SilentlyContinue
-          Write-Host "Scoop Help (check for checkver):"
-          scoop.exe help -ErrorAction SilentlyContinue
-          scoop.exe help checkver -ErrorAction SilentlyContinue
-          Write-Host "Scoop Status:"
-          scoop.exe status -ErrorAction SilentlyContinue
           Write-Host "--- End Verification ---"
         continue-on-error: true
 
@@ -125,16 +127,21 @@ jobs:
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          echo "--- Git Status Before Diff ---"
+          echo "--- Git Status Before Add ---"
           git status
-          echo "--- End Git Status ---"
           
-          if ! git diff --quiet HEAD; then
-            echo "Changes detected, committing and pushing..."
-            git add bucket/*.json README.md
+          # Add only specific files that are expected to change
+          git add bucket/*.json README.md
+          
+          echo "--- Git Status After Add (Before Commit) ---"
+          git status
+
+          # Check if there are staged changes to commit
+          if ! git diff --cached --quiet; then
+            echo "Changes detected and staged, committing and pushing..."
             git commit -m "Automated: Update app manifests, hashes, and README"
             git push
           else
-            echo "No changes to commit."
+            echo "No staged changes to commit."
           fi
         shell: bash
