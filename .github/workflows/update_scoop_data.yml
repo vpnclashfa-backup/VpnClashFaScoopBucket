@@ -1,4 +1,4 @@
-name: Update Scoop Bucket (Using Scoop Source - Corrected Paths)
+name: Update Scoop Bucket (Using Scoop Source - Diagnostic Checkout)
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -10,73 +10,86 @@ jobs:
     runs-on: windows-latest
 
     permissions:
-      contents: write # Needed to commit changes back to the repository
+      contents: write 
 
     steps:
       - name: Checkout Your Bucket Repository (VpnClashFaScoopBucket)
         uses: actions/checkout@v4
-        # This checks out your repository to GITHUB_WORKSPACE
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Path defaults to GITHUB_WORKSPACE
 
       - name: Checkout Scoop Source Code
         uses: actions/checkout@v4
         with:
-          repository: ScoopInstaller/Scoop # Official Scoop repository
-          path: scoop_source_checkout    # Checkout Scoop source to GITHUB_WORKSPACE/scoop_source_checkout
-          # fetch-depth: 1 # Optional: fetch only the latest commit if needed
+          repository: ScoopInstaller/Scoop 
+          path: scoop_source_checkout # Checks out to $GITHUB_WORKSPACE/scoop_source_checkout
+          ref: master # Explicitly use master branch for stability
+          # fetch-depth: 0 # Uncomment for full history if needed, default is 1 for actions/checkout@v4
+
+      - name: Diagnostic File Listing for Scoop Source Checkout
+        id: diagnostic_listing
+        shell: pwsh
+        run: |
+          $ScoopSourceDir = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
+          Write-Host "--- Diagnostic: Listing Scoop Source Checkout at '$ScoopSourceDir' ---"
+          
+          Write-Host "Checking existence of '$ScoopSourceDir': $(Test-Path $ScoopSourceDir -PathType Container)"
+          Write-Host "Top-level contents of '$ScoopSourceDir':"
+          Get-ChildItem -Path $ScoopSourceDir -Depth 0 -Force | ForEach-Object { Write-Output "  L0: $($_.Name) (Mode: $($_.Mode))" }
+          
+          $ScoopModulesDir = Join-Path $ScoopSourceDir "modules"
+          Write-Host "Checking existence of '$ScoopModulesDir': $(Test-Path $ScoopModulesDir -PathType Container)"
+          Write-Host "Contents of '$ScoopModulesDir' (if it exists):"
+          Get-ChildItem -Path $ScoopModulesDir -ErrorAction SilentlyContinue -Force | ForEach-Object { Write-Output "  L1-Modules: $($_.Name) (Mode: $($_.Mode), Length: $($_.Length))" }
+          
+          $ExpectedModuleFile = Join-Path $ScoopModulesDir "scoop.psm1"
+          Write-Host "Checking existence of '$ExpectedModuleFile': $(Test-Path $ExpectedModuleFile -PathType Leaf)"
+          if (Test-Path $ExpectedModuleFile -PathType Leaf) {
+            Write-Host "SUCCESS (Diagnostic): '$ExpectedModuleFile' exists."
+          } else {
+            Write-Error "FAILURE (Diagnostic): '$ExpectedModuleFile' does NOT exist."
+          }
+          Write-Host "--- End Diagnostic ---"
 
       - name: Set up Scoop Environment and Run Update-ScoopVersions.ps1
         id: scoop_operations
         shell: pwsh
         run: |
-          # Set SCOOP_HOME to the absolute path of the checked-out Scoop source code
-          $ResolvedScoopSourcePath = (Resolve-Path "./scoop_source_checkout").Path
-          $env:SCOOP_HOME = $ResolvedScoopSourcePath
+          $env:SCOOP_HOME = "$env:GITHUB_WORKSPACE\scoop_source_checkout" 
           echo "SCOOP_HOME=$($env:SCOOP_HOME)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "SCOOP_HOME set to: $($env:SCOOP_HOME)"
 
-          # Add Scoop's bin directory from source to PATH for the current session
-          # This is mainly for completeness; module import is the primary mechanism for commands.
           $ScoopSourceBinPath = Join-Path $env:SCOOP_HOME "bin"
           if ($env:PATH -notlike "*$ScoopSourceBinPath*") {
             $env:PATH = "$ScoopSourceBinPath;$($env:PATH)"
             Write-Host "Added '$ScoopSourceBinPath' to current session PATH."
           }
-          # Also add to GITHUB_PATH for any subsequent separate PowerShell steps (if any)
           Add-Content -Path $env:GITHUB_PATH -Value $ScoopSourceBinPath
           Write-Host "Added '$ScoopSourceBinPath' to GITHUB_PATH."
           
-          Write-Host "Current session PATH relevant part: $($env:PATH.Substring(0, [System.Math]::Min($env:PATH.Length, 300)))..."
-
-          # Verify that the scoop.psm1 module exists in the checked-out source
+          # This check is now somewhat redundant if the diagnostic step passes, but kept for safety
           $ScoopModulePathFromSource = Join-Path $env:SCOOP_HOME "modules\scoop.psm1"
-          Write-Host "Expected Scoop Module Path (from source): $ScoopModulePathFromSource"
+          Write-Host "Verifying Module Path (in main script block): $ScoopModulePathFromSource"
           if (!(Test-Path $ScoopModulePathFromSource -PathType Leaf)) {
-            Write-Error "CRITICAL FAILURE: Scoop module file '$ScoopModulePathFromSource' NOT FOUND in checked-out Scoop source at '$($env:SCOOP_HOME)\modules'."
-            Write-Host "Listing contents of '$($env:SCOOP_HOME)\modules\' (if it exists):"
-            Get-ChildItem (Join-Path $env:SCOOP_HOME "modules") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
-            Write-Host "Listing contents of '$($env:SCOOP_HOME)\':"
-            Get-ChildItem $env:SCOOP_HOME -Depth 1 | ForEach-Object { Write-Output "  - $($_.Name)" }
+            Write-Error "CRITICAL FAILURE (in main script block): Scoop module file '$ScoopModulePathFromSource' NOT FOUND."
+            Write-Host "This suggests an issue with file visibility or persistence between steps, or the checkout failed to retrieve it."
             exit 1
           }
-          Write-Output "SUCCESS: Scoop module file FOUND at '$ScoopModulePathFromSource'."
+          Write-Output "SUCCESS (in main script block): Scoop module file FOUND at '$ScoopModulePathFromSource'."
           
-          # The Update-ScoopVersions.ps1 script is in the root of your checked-out repository
           $ScriptPath = "./Update-ScoopVersions.ps1" 
           Write-Host "Running PowerShell Script: $ScriptPath"
           if (!(Test-Path $ScriptPath)) {
-            Write-Error "Update-ScoopVersions.ps1 not found at '$ScriptPath'. Ensure it's in the repository root."
+            Write-Error "Update-ScoopVersions.ps1 not found at '$ScriptPath'."
             exit 1
           }
-          # $env:SCOOP_HOME is now set; the script will use it to find the module.
-          # BucketPath is relative to GITHUB_WORKSPACE (where your repo is checked out)
           & $ScriptPath -BucketPath "./bucket" 
           
           if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Update-ScoopVersions.ps1 script finished with a non-zero exit code: $LASTEXITCODE."
+            Write-Warning "Update-ScoopVersions.ps1 script finished with non-zero exit code: $LASTEXITCODE."
           } else {
-            Write-Host "Update-ScoopVersions.ps1 script finished successfully (Exit Code 0)."
+            Write-Host "Update-ScoopVersions.ps1 script finished successfully."
           }
 
       - name: Set up Python
@@ -86,7 +99,6 @@ jobs:
 
       - name: Install Python dependencies
         run: python -m pip install --upgrade pip && pip install requests
-        # No working-directory needed if requirements.txt is at root or not used
         shell: pwsh
 
       - name: Run Python script to Update Hashes and README
@@ -94,26 +106,18 @@ jobs:
         env:
           PYTHONIOENCODING: UTF-8
           GITHUB_REPOSITORY: ${{ github.repository }}
-        # Python script is at the root of your checked-out repository
         run: python ./Update-HashesAndReadme.py 
-        # The Python script uses BUCKET_SUBDIRECTORY = "bucket", which will be ./bucket
         shell: pwsh
 
       - name: Commit and Push Changes
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Git commands run from GITHUB_WORKSPACE (your repo root)
           echo "--- Git Status Before Add (in $(pwd)) ---"
           git status
-          
-          # Add specific files expected to change, relative to your repo root
           git add bucket/*.json README.md
-          
           echo "--- Git Status After Add (Before Commit in $(pwd)) ---"
           git status
-
           if ! git diff --cached --quiet; then
             echo "Changes detected and staged, committing and pushing..."
             git commit -m "Automated: Update app manifests, hashes, and README"
