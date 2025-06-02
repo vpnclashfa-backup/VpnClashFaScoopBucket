@@ -4,117 +4,107 @@ param (
     [Parameter(Mandatory=$false)]
     [string]$BucketPath = "./bucket",
 
-    [Parameter(Mandatory=$true)] # This path is used to derive $env:SCOOP
+    [Parameter(Mandatory=$true)] 
     [string]$ProvidedScoopShimsPath 
 )
 
-Write-Output "Script Version: v10_module_critical"
+Write-Output "Script Version: v11_try_scoop_cmd"
 Write-Output "Provided BucketPath: $BucketPath"
 Write-Output "Provided ScoopShimsPath from workflow: $ProvidedScoopShimsPath"
 
-# Step 1: Determine $env:SCOOP from $ProvidedScoopShimsPath
+$ScoopCmdPath = $null
+
+# Step 1: Construct the explicit path to scoop.cmd
 if (-not [string]::IsNullOrWhiteSpace($ProvidedScoopShimsPath)) {
     if (Test-Path $ProvidedScoopShimsPath -PathType Container) {
-        $env:SCOOP = Split-Path $ProvidedScoopShimsPath # $SCOOP is the parent directory of 'shims'
-        Write-Output "Derived \$env:SCOOP as: $($env:SCOOP)"
-        # Also ensure shims path is in the current script's PATH for good measure, though module import is key
-        if ($env:PATH -notlike "*$ProvidedScoopShimsPath*") {
-            $env:PATH = "$ProvidedScoopShimsPath;$($env:PATH)"
-            Write-Output "Prepended '$ProvidedScoopShimsPath' to this script's session PATH."
+        $PotentialScoopCmd = Join-Path $ProvidedScoopShimsPath "scoop.cmd"
+        Write-Output "Testing for scoop.cmd at: '$PotentialScoopCmd'"
+        if (Test-Path $PotentialScoopCmd -PathType Leaf) {
+            $ScoopCmdPath = $PotentialScoopCmd
+            Write-Output "SUCCESS: scoop.cmd found at explicit path: $ScoopCmdPath"
+        } else {
+            Write-Error "CRITICAL FAILURE: scoop.cmd NOT FOUND as a file at '$PotentialScoopCmd'."
+            Write-Output "Listing contents of '$ProvidedScoopShimsPath' for debugging:"
+            Get-ChildItem -Path $ProvidedScoopShimsPath | ForEach-Object { Write-Output "  - $($_.Name) (Type: $($_.GetType().Name))" }
+            exit 1
         }
     } else {
-        Write-Error "CRITICAL: Provided Scoop Shims Path '$ProvidedScoopShimsPath' does NOT exist or is not a directory. Cannot derive \$env:SCOOP."
+        Write-Error "CRITICAL: Provided Scoop Shims Path '$ProvidedScoopShimsPath' does NOT exist or is not a directory."
         exit 1
     }
 } else {
-    Write-Error "CRITICAL: No ScoopShimsPath was provided. This is required to locate the Scoop module."
+    Write-Error "CRITICAL: No ScoopShimsPath was provided to the script. This is required."
     exit 1
 }
 
-# Step 2: CRITICAL - Find and import the Scoop module (scoop.psm1)
-$ScoopModulePath = Join-Path $env:SCOOP "apps\scoop\current\modules\scoop.psm1"
-$ScoopModuleDir = Split-Path $ScoopModulePath
-Write-Output "Attempting to find and import Scoop module from: '$ScoopModulePath'"
-
-if (Test-Path $ScoopModulePath -PathType Leaf) {
-    Write-Output "Scoop module file FOUND at '$ScoopModulePath'."
-    
-    # Add the module's directory to PSModulePath to help PowerShell find it, then import by full path.
-    $OriginalPSModulePath = $env:PSModulePath
-    $env:PSModulePath = "$ScoopModuleDir;$($env:PSModulePath)"
-    Write-Output "Temporarily prepended '$ScoopModuleDir' to \$env:PSModulePath."
-    
-    try {
-        Write-Output "Attempting to import Scoop module with -Force and -Verbose..."
-        Import-Module $ScoopModulePath -Force -Verbose 
-        Write-Output "SUCCESS: Scoop module imported (or re-imported)."
-        
-        # Verify if 'scoop' command (as a function/alias from module) is now available
-        $ScoopCommandInfo = Get-Command scoop -CommandType Function,Alias,Cmdlet -ErrorAction SilentlyContinue
-        if ($ScoopCommandInfo) {
-            Write-Output "'scoop' command (from module) is now available. Type: $($ScoopCommandInfo.CommandType), Definition/Source: $($ScoopCommandInfo.Definition)"
-        } else {
-            # This would be very strange if the module imported successfully but didn't define 'scoop'
-            Write-Error "CRITICAL UNEXPECTED: 'scoop' command (as function/alias/cmdlet) NOT found after successful module import. Scoop installation might be corrupted."
-            exit 1
-        }
-    } catch {
-        Write-Error "CRITICAL FAILURE: Could not import Scoop module from '$ScoopModulePath' even though the file exists. Error: $($_.Exception.Message)"
-        $env:PSModulePath = $OriginalPSModulePath # Restore original module path
-        exit 1 # Fail the script if module import fails
-    }
-    $env:PSModulePath = $OriginalPSModulePath # Restore original module path
-} else {
-    Write-Error "CRITICAL FAILURE: Scoop module file '$ScoopModulePath' NOT FOUND. The 'scoop update scoop' command in the workflow might not have fully provisioned the 'scoop' app."
-    Write-Output "For debugging - Contents of '$($env:SCOOP)\apps\scoop\current\modules\' (if it exists):"
-    Get-ChildItem (Join-Path $env:SCOOP "apps\scoop\current\modules") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)"}
-    exit 1 # Fail the script if module file is not found
+# Optional: Ensure $env:SCOOP is set, as scoop.cmd might rely on it internally
+$env:SCOOP = Split-Path $ProvidedScoopShimsPath
+Write-Output "Ensured \$env:SCOOP is set to: $($env:SCOOP)"
+# Optional: Ensure shims path is in PATH for the cmd process, though direct call should work
+if ($env:PATH -notlike "*$ProvidedScoopShimsPath*") {
+    $env:PATH = "$ProvidedScoopShimsPath;$($env:PATH)"
+    Write-Output "Prepended '$ProvidedScoopShimsPath' to this script's session PATH (for cmd context)."
 }
-
 Write-Output "--------------------------------------------------------------------"
-# At this point, the Scoop module MUST be loaded. 
-# The 'scoop' command should refer to a function/cmdlet from this module.
 
 $ManifestFiles = Get-ChildItem -Path $BucketPath -Filter "*.json" -File -ErrorAction SilentlyContinue
 if (-not $ManifestFiles) {
     Write-Warning "No manifest files (.json) found in '$BucketPath'."
-    exit 0 # Not an error, just no work to do for this part
+    exit 0 
 }
 
-$GlobalSuccess = $true # Tracks success of checkver operations
+$GlobalSuccess = $true 
 foreach ($ManifestFileItem in $ManifestFiles) {
     $AppName = $ManifestFileItem.BaseName
-    Write-Output ""
+    Write-Output "" 
     Write-Output "Processing: $AppName (File: $($ManifestFileItem.Name))"
     try {
-        # Call 'scoop' directly. PowerShell should resolve this to the function/cmdlet from the imported module.
-        Write-Output "  Running: scoop checkver '$AppName' -u (using imported module's command)"
-        $ProcessOutput = scoop checkver "$AppName" -u *>&1 
+        # Execute scoop.cmd directly
+        $CommandToRun = "$ScoopCmdPath checkver `"$AppName`" -u"
+        Write-Output "  Running command: $CommandToRun"
+        
+        # Invoke using cmd.exe /c to ensure it runs in a cmd context
+        # Capture output and errors
+        $Process = Start-Process cmd.exe -ArgumentList "/c $CommandToRun" -Wait -NoNewWindow -PassThru -RedirectStandardOutput "stdout.log" -RedirectStandardError "stderr.log"
+        
+        $StdOut = Get-Content "stdout.log" -ErrorAction SilentlyContinue
+        $StdErr = Get-Content "stderr.log" -ErrorAction SilentlyContinue
+        Remove-Item "stdout.log", "stderr.log" -ErrorAction SilentlyContinue
 
-        # $LASTEXITCODE is for external commands. For PowerShell functions/cmdlets, errors are typically exceptions.
-        # However, 'scoop checkver' might still internally call executables or set $LASTEXITCODE.
-        if ($LASTEXITCODE -ne 0) { 
-            Write-Warning "  Scoop checkver for '$AppName' finished. Exit Code (if applicable): $LASTEXITCODE."
+        $ExitCode = $Process.ExitCode
+        Write-Output "  scoop.cmd process exited with code: $ExitCode"
+
+        if ($StdOut) {
+            Write-Output "  Standard Output from scoop.cmd:"
+            $StdOut | ForEach-Object { Write-Output "    $_" }
+        }
+        if ($StdErr) {
+            Write-Warning "  Standard Error from scoop.cmd:"
+            $StdErr | ForEach-Object { Write-Warning "    $_" }
+        }
+        
+        # Check for the specific warning from Scoop itself
+        if (($StdOut -join "`n" -match "isn't a scoop command") -or ($StdErr -join "`n" -match "isn't a scoop command")) {
+             Write-Warning "  Scoop (via cmd) reported 'checkver' is not a command for '$AppName'."
+             # Optionally set $GlobalSuccess = $false or handle as a specific type of failure
+        } elseif ($ExitCode -ne 0) {
+            Write-Warning "  scoop.cmd checkver for '$AppName' finished with a non-zero Exit Code: $ExitCode."
         } else {
-            Write-Output "  Scoop checkver for '$AppName' completed (Exit Code (if applicable): 0)."
+            Write-Output "  scoop.cmd checkver for '$AppName' completed (Exit Code: 0)."
         }
-        if ($ProcessOutput) {
-            Write-Output "  Output from Scoop checkver for '$AppName':"
-            $ProcessOutput | ForEach-Object { Write-Output "    $_" }
-        }
-    } catch { # Catch exceptions if 'scoop' or 'checkver' (as a function) throws an error
-        Write-Error "  An UNEXPECTED PowerShell error/exception occurred while running Scoop checkver for '$AppName': $($_.Exception.Message)"
-        $GlobalSuccess = $false
+
+    } catch {
+        Write-Error "  An UNEXPECTED PowerShell error occurred while trying to run scoop.cmd for '$AppName': $($_.Exception.Message)"
+        $GlobalSuccess = $false 
     }
-    Write-Output "---------------------------"
+    Write-Output "---------------------------" 
 }
 
-Write-Output ""
+Write-Output "" 
 Write-Output "===================================================================="
 if ($GlobalSuccess) {
     Write-Output "Manifest version and URL update process completed its run."
 } else {
-    Write-Warning "Manifest version and URL update process encountered UNEXPECTED SCRIPT errors/exceptions."
-    # exit 1 # Optionally fail the entire script if any checkver had an issue
+    Write-Warning "Manifest version and URL update process encountered UNEXPECTED SCRIPT errors or scoop.cmd failures."
 }
-Write-Output "Script Update-ScoopVersions.ps1 (v10_module_critical) finished."
+Write-Output "Script Update-ScoopVersions.ps1 (v11_try_scoop_cmd) finished."
