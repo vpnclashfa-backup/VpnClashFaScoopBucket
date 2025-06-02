@@ -3,7 +3,7 @@ name: Update Scoop Bucket (Multi-Script)
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '30 16 * * *' # Daily at 16:30 UTC (approx 8 PM Tehran time)
+    - cron: '30 16 * * *' # Daily at 16:30 UTC
 
 jobs:
   update_bucket_files:
@@ -18,21 +18,39 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Scoop
-        uses: MinoruSekine/setup-scoop@v1
+      - name: Setup Scoop using babochka/setup-scoop
+        uses: babochka/setup-scoop@v2
+        id: setup_scoop
+        # This action automatically adds Scoop to PATH
 
-      - name: Add Scoop shims to PATH (for subsequent PowerShell steps)
-        run: echo "$HOME\scoop\shims" | Add-Content -Path $env:GITHUB_PATH
+      - name: Update Scoop itself and core buckets
         shell: pwsh
-
-      - name: Update Scoop and add/update essential buckets
         run: |
+          Write-Host "Updating Scoop and core buckets..."
           scoop update scoop
-          scoop bucket add main # Ensure main bucket is present
-          scoop bucket add extras # Extras bucket often contains useful utilities
+          scoop bucket rm main # Attempt to remove and re-add to ensure freshness
+          scoop bucket add main
+          scoop bucket add extras
           scoop update # Update all buckets
+        continue-on-error: true # Continue if rm/add fails (e.g., main was not there to rm)
+
+      - name: Verify Scoop installation and checkver command
         shell: pwsh
-        continue-on-error: true # Continue if a bucket add fails (e.g. already exists)
+        run: |
+          Write-Host "--- Verifying Scoop Installation ---"
+          Write-Host "Scoop executable path (from Get-Command):"
+          Get-Command scoop.exe | Format-List *
+          Write-Host "Scoop Shims Path (from setup_scoop action output): ${{ steps.setup_scoop.outputs.scoop-shims-path }}"
+          Write-Host "PATH environment variable:"
+          $env:PATH -split ';' | ForEach-Object { Write-Host "  $_" }
+          Write-Host "Scoop Version:"
+          scoop.exe --version
+          Write-Host "Scoop Help (check for checkver):"
+          scoop.exe help
+          scoop.exe help checkver # Specifically check help for checkver
+          Write-Host "Scoop Status:"
+          scoop.exe status
+          Write-Host "--- End Verification ---"
 
       - name: Run PowerShell Script to Update Manifest Versions & URLs
         id: update_versions_urls
@@ -61,6 +79,10 @@ jobs:
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          echo "--- Git Status Before Diff ---"
+          git status
+          echo "--- End Git Status ---"
           
           if ! git diff --quiet HEAD; then
             echo "Changes detected, committing and pushing..."
