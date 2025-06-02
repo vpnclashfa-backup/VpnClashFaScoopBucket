@@ -1,9 +1,9 @@
-name: Update Scoop Bucket (Multi-Script)
+name: Update Scoop Bucket (Using Scoop Source - Corrected Paths)
 
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '0 20 * * *' # Changed cron to 20:00 UTC for less overlap with other tasks potentially
+    - cron: '0 22 * * *' # Runs daily at 22:00 UTC
 
 jobs:
   update_bucket_files:
@@ -13,98 +13,68 @@ jobs:
       contents: write # Needed to commit changes back to the repository
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Your Bucket Repository (VpnClashFaScoopBucket)
         uses: actions/checkout@v4
+        # This checks out your repository to GITHUB_WORKSPACE
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Scoop, Ensure Full Setup, and Run Update Script
+      - name: Checkout Scoop Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: ScoopInstaller/Scoop # Official Scoop repository
+          path: scoop_source_checkout    # Checkout Scoop source to GITHUB_WORKSPACE/scoop_source_checkout
+          # fetch-depth: 1 # Optional: fetch only the latest commit if needed
+
+      - name: Set up Scoop Environment and Run Update-ScoopVersions.ps1
         id: scoop_operations
         shell: pwsh
         run: |
-          Write-Host "Attempting to install Scoop manually..."
-          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-          $ErrorActionPreference = "Stop" # Stop on first error for critical download/install part
-          try {
-            Invoke-RestMethod -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
-          } catch {
-            Write-Warning "Invoke-RestMethod failed. Error: $($_.Exception.Message)"
-            Write-Host "Trying with Invoke-WebRequest..."
-            Invoke-WebRequest -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
-          }
-          $ErrorActionPreference = "Continue" # Reset error action preference
+          # Set SCOOP_HOME to the absolute path of the checked-out Scoop source code
+          $ResolvedScoopSourcePath = (Resolve-Path "./scoop_source_checkout").Path
+          $env:SCOOP_HOME = $ResolvedScoopSourcePath
+          echo "SCOOP_HOME=$($env:SCOOP_HOME)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "SCOOP_HOME set to: $($env:SCOOP_HOME)"
 
-          if (!(Test-Path scoop_installer.ps1)) {
-            Write-Error "Scoop installer script (scoop_installer.ps1) not found after download attempt."
+          # Add Scoop's bin directory from source to PATH for the current session
+          # This is mainly for completeness; module import is the primary mechanism for commands.
+          $ScoopSourceBinPath = Join-Path $env:SCOOP_HOME "bin"
+          if ($env:PATH -notlike "*$ScoopSourceBinPath*") {
+            $env:PATH = "$ScoopSourceBinPath;$($env:PATH)"
+            Write-Host "Added '$ScoopSourceBinPath' to current session PATH."
+          }
+          # Also add to GITHUB_PATH for any subsequent separate PowerShell steps (if any)
+          Add-Content -Path $env:GITHUB_PATH -Value $ScoopSourceBinPath
+          Write-Host "Added '$ScoopSourceBinPath' to GITHUB_PATH."
+          
+          Write-Host "Current session PATH relevant part: $($env:PATH.Substring(0, [System.Math]::Min($env:PATH.Length, 300)))..."
+
+          # Verify that the scoop.psm1 module exists in the checked-out source
+          $ScoopModulePathFromSource = Join-Path $env:SCOOP_HOME "modules\scoop.psm1"
+          Write-Host "Expected Scoop Module Path (from source): $ScoopModulePathFromSource"
+          if (!(Test-Path $ScoopModulePathFromSource -PathType Leaf)) {
+            Write-Error "CRITICAL FAILURE: Scoop module file '$ScoopModulePathFromSource' NOT FOUND in checked-out Scoop source at '$($env:SCOOP_HOME)\modules'."
+            Write-Host "Listing contents of '$($env:SCOOP_HOME)\modules\' (if it exists):"
+            Get-ChildItem (Join-Path $env:SCOOP_HOME "modules") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
+            Write-Host "Listing contents of '$($env:SCOOP_HOME)\':"
+            Get-ChildItem $env:SCOOP_HOME -Depth 1 | ForEach-Object { Write-Output "  - $($_.Name)" }
             exit 1
           }
-
-          Write-Host "Running Scoop installer..."
-          $env:SCOOP = "$HOME\scoop" # Explicitly set SCOOP env var for the installer and current session
-          if (-not (Test-Path $env:SCOOP)) {
-            New-Item -ItemType Directory -Path $env:SCOOP -Force | Out-Null
-          }
-          .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir $env:SCOOP # -RunSelfUpdate should update Scoop app itself
-          Write-Host "Scoop installation script executed."
-
-          $ScoopShimsPath = Join-Path $env:SCOOP "shims"
-          Write-Host "Determined Scoop Shims Path: $ScoopShimsPath"
+          Write-Output "SUCCESS: Scoop module file FOUND at '$ScoopModulePathFromSource'."
           
-          # Add Scoop shims to PATH immediately for subsequent scoop commands in this step
-          if ($env:PATH -notlike "*$ScoopShimsPath*") {
-            $env:PATH = "$ScoopShimsPath;$env:PATH"
-            Write-Host "Added '$ScoopShimsPath' to current session PATH."
-          }
-          # Add to GITHUB_PATH for future steps in the job
-          Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
-          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH."
-          
-          Write-Host "Verifying basic Scoop command after initial install..."
-          scoop --version
-          scoop status
-
-          Write-Host "Attempting to explicitly update 'scoop' app itself to ensure all components (like modules) are present..."
-          scoop update scoop # This command should ensure the 'scoop' app is at its latest version and fully installed
-          Write-Host "'scoop update scoop' command finished."
-
-          # CRITICAL CHECK: Verify module existence AFTER 'scoop update scoop'
-          $ScoopModulePath = Join-Path $env:SCOOP "apps\scoop\current\modules\scoop.psm1"
-          Write-Host "Expected Scoop Module Path after 'scoop update scoop': $ScoopModulePath"
-          if (Test-Path $ScoopModulePath -PathType Leaf) {
-            Write-Output "SUCCESS: Scoop module file FOUND at '$ScoopModulePath'."
-            Write-Host "Listing contents of '$($env:SCOOP)\apps\scoop\current\modules\' (if it exists):"
-            Get-ChildItem (Join-Path $env:SCOOP "apps\scoop\current\modules") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
-          } else {
-            Write-Error "CRITICAL FAILURE: Scoop module file STILL NOT FOUND at '$ScoopModulePath' even after 'scoop update scoop'."
-            Write-Host "This indicates a fundamental issue with the Scoop installation or how 'scoop update scoop' behaves in this environment."
-            Write-Host "Listing contents of '$($env:SCOOP)\apps\scoop\current\':"
-            Get-ChildItem (Join-Path $env:SCOOP "apps\scoop\current") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
-            exit 1 # Fail fast if module is still missing, as subsequent steps will fail
-          }
-          
-          Remove-Item scoop_installer.ps1 -Force
-          Write-Host "Removed scoop_installer.ps1."
-
-          Write-Host "Updating core buckets (main, extras)..."
-          scoop bucket rm main -ErrorAction SilentlyContinue
-          scoop bucket add main
-          scoop bucket rm extras -ErrorAction SilentlyContinue
-          scoop bucket add extras
-          scoop update # Update all known buckets
-          Write-Host "Scoop and core buckets update process finished."
-
-          $ScriptPath = "./Update-ScoopVersions.ps1" # Assuming this script is in the root of your repo
-          Write-Host "Running PowerShell Script: $ScriptPath with Shims Path parameter '$ScoopShimsPath'"
+          # The Update-ScoopVersions.ps1 script is in the root of your checked-out repository
+          $ScriptPath = "./Update-ScoopVersions.ps1" 
+          Write-Host "Running PowerShell Script: $ScriptPath"
           if (!(Test-Path $ScriptPath)) {
-            Write-Error "Update-ScoopVersions.ps1 not found at $ScriptPath. Make sure it's in the repository root."
+            Write-Error "Update-ScoopVersions.ps1 not found at '$ScriptPath'. Ensure it's in the repository root."
             exit 1
           }
-          # The Update-ScoopVersions.ps1 script (version v10_module_critical) will use $ProvidedScoopShimsPath to derive $env:SCOOP and then find the module
-          & $ScriptPath -BucketPath "./bucket" -ProvidedScoopShimsPath $ScoopShimsPath
+          # $env:SCOOP_HOME is now set; the script will use it to find the module.
+          # BucketPath is relative to GITHUB_WORKSPACE (where your repo is checked out)
+          & $ScriptPath -BucketPath "./bucket" 
+          
           if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Update-ScoopVersions.ps1 script finished with a non-zero exit code: $LASTEXITCODE. This might indicate issues."
-            # Consider exiting with error if the script's failure is critical for the workflow
-            # exit 1 
+            Write-Warning "Update-ScoopVersions.ps1 script finished with a non-zero exit code: $LASTEXITCODE."
           } else {
             Write-Host "Update-ScoopVersions.ps1 script finished successfully (Exit Code 0)."
           }
@@ -116,6 +86,7 @@ jobs:
 
       - name: Install Python dependencies
         run: python -m pip install --upgrade pip && pip install requests
+        # No working-directory needed if requirements.txt is at root or not used
         shell: pwsh
 
       - name: Run Python script to Update Hashes and README
@@ -123,18 +94,26 @@ jobs:
         env:
           PYTHONIOENCODING: UTF-8
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python Update-HashesAndReadme.py
+        # Python script is at the root of your checked-out repository
+        run: python ./Update-HashesAndReadme.py 
+        # The Python script uses BUCKET_SUBDIRECTORY = "bucket", which will be ./bucket
         shell: pwsh
 
       - name: Commit and Push Changes
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          echo "--- Git Status Before Add ---"
+          
+          # Git commands run from GITHUB_WORKSPACE (your repo root)
+          echo "--- Git Status Before Add (in $(pwd)) ---"
           git status
+          
+          # Add specific files expected to change, relative to your repo root
           git add bucket/*.json README.md
-          echo "--- Git Status After Add (Before Commit) ---"
+          
+          echo "--- Git Status After Add (Before Commit in $(pwd)) ---"
           git status
+
           if ! git diff --cached --quiet; then
             echo "Changes detected and staged, committing and pushing..."
             git commit -m "Automated: Update app manifests, hashes, and README"
