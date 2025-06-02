@@ -1,4 +1,4 @@
-name: Update Scoop Bucket (Manual Scoop App Overwrite)
+name: Update Scoop Bucket (Manual Scoop App Overwrite - Detailed Extract Debug)
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -66,10 +66,6 @@ jobs:
           # --- Manually download and overwrite the 'scoop' app itself ---
           $ScoopAppDir = Join-Path $env:SCOOP "apps\scoop"
           $ScoopAppCurrentDir = Join-Path $ScoopAppDir "current"
-          $ScoopAppReleaseUrl = "https://github.com/ScoopInstaller/Scoop/releases/latest/download/Scoop-v0.5.2.zip" # Example, ideally get latest dynamically or use a fixed known good version
-          # To get latest release dynamically (more complex, requires parsing GitHub API or release page)
-          # For now, let's assume a recent, known-good version like v0.5.2 (check latest on Scoop's GitHub releases)
-          # Or, even better, use the source archive as it's always master
           $ScoopAppSourceArchiveUrl = "https://github.com/ScoopInstaller/Scoop/archive/refs/heads/master.zip"
           $ScoopAppArchivePath = "$env:GITHUB_WORKSPACE\scoop_app_source.zip"
           $TempAppExtractPath = "$env:GITHUB_WORKSPACE\scoop_app_temp_extract"
@@ -95,22 +91,44 @@ jobs:
           Write-Host "[ACTION] Extracting Scoop app source archive '$ScoopAppArchivePath' to '$TempAppExtractPath'..."
           try {
             Expand-Archive -Path $ScoopAppArchivePath -DestinationPath $TempAppExtractPath -Force
+            Write-Host "[SUCCESS] Archive extracted to $TempAppExtractPath"
+
             $ExtractedItems = Get-ChildItem -Path $TempAppExtractPath
+            Write-Host "[DEBUG] Items found in '$TempAppExtractPath' after extraction: $($ExtractedItems.Count)"
+            $ExtractedItems | ForEach-Object { Write-Host "[DEBUG]   - $($_.Name) (IsContainer: $($_.PSIsContainer))" }
+
             if ($ExtractedItems.Count -eq 1 -and $ExtractedItems[0].PSIsContainer) {
                 $TopLevelFolderNameInZip = $ExtractedItems[0].FullName
                 Write-Host "[INFO] Detected single top-level folder in app ZIP: $TopLevelFolderNameInZip."
+                
+                Write-Host "[DEBUG] Listing contents of '$TopLevelFolderNameInZip' BEFORE move:"
+                Get-ChildItem -Path $TopLevelFolderNameInZip -Recurse -Depth 1 | ForEach-Object { Write-Host "[DEBUG]   Found in extracted top-level: $($_.FullName.Replace($TopLevelFolderNameInZip, '')) (Mode: $($_.Mode))" }
+                $ModulesDirInExtracted = Join-Path $TopLevelFolderNameInZip "modules"
+                Write-Host "[DEBUG] Checking for 'modules' directory in '$TopLevelFolderNameInZip': $(Test-Path $ModulesDirInExtracted -PathType Container)"
+                if(Test-Path $ModulesDirInExtracted -PathType Container) {
+                  Get-ChildItem -Path $ModulesDirInExtracted | ForEach-Object { Write-Host "[DEBUG]     Found in extracted 'modules': $($_.Name)" }
+                }
+
                 Write-Host "[ACTION] Moving contents from '$TopLevelFolderNameInZip' to '$ScoopAppCurrentDir'..."
                 Move-Item -Path (Join-Path $TopLevelFolderNameInZip "*") -Destination $ScoopAppCurrentDir -Force
+                Write-Host "[SUCCESS] Contents moved from '$TopLevelFolderNameInZip' to '$ScoopAppCurrentDir'."
+
+                Write-Host "[DEBUG] Listing contents of '$ScoopAppCurrentDir' AFTER move:"
+                Get-ChildItem -Path $ScoopAppCurrentDir -Recurse -Depth 1 | ForEach-Object { Write-Host "[DEBUG]   Found in target: $($_.FullName.Replace($ScoopAppCurrentDir, '')) (Mode: $($_.Mode))" }
+
             } else {
-                Write-Warning "[WARNING] No single top-level folder, or multiple items, found in app ZIP. Moving all from '$TempAppExtractPath'."
+                Write-Warning "[WARNING] No single top-level folder, or multiple items, found in app ZIP. Attempting to move all from '$TempAppExtractPath'."
+                # This path might be problematic if the structure isn't as expected.
                 Move-Item -Path (Join-Path $TempAppExtractPath "*") -Destination $ScoopAppCurrentDir -Force
+                Write-Host "[SUCCESS] All items moved from '$TempAppExtractPath' to '$ScoopAppCurrentDir'."
             }
-            Write-Host "[SUCCESS] Scoop app contents overwritten in '$ScoopAppCurrentDir'."
+            # Write-Host "[SUCCESS] Scoop app contents overwritten in '$ScoopAppCurrentDir'." # Original success message
           } catch {
             Write-Error "[CRITICAL] Failed to extract or move Scoop app archive contents. Error: $($_.Exception.Message)"
             exit 1
           } finally {
             if (Test-Path $TempAppExtractPath) { Remove-Item $TempAppExtractPath -Recurse -Force }
+            Write-Host "[INFO] Removed temporary extract directory $TempAppExtractPath."
           }
           Remove-Item $ScoopAppArchivePath -Force
           Write-Host "[INFO] Removed downloaded Scoop app source archive."
@@ -124,8 +142,8 @@ jobs:
             Write-Error "[CRITICAL FAILURE] Scoop module file NOT FOUND at '$ScoopModulePath' even after manual app overwrite."
             Write-Host "Listing contents of '$ScoopAppCurrentDir\modules\' (if it exists):"
             Get-ChildItem (Join-Path $ScoopAppCurrentDir "modules") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
-            Write-Host "Listing contents of '$ScoopAppCurrentDir\':"
-            Get-ChildItem $ScoopAppCurrentDir -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
+            Write-Host "Listing contents of '$ScoopAppCurrentDir\' (Top level only):"
+            Get-ChildItem $ScoopAppCurrentDir -Depth 0 -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
             exit 1 
           }
           
