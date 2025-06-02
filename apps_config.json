@@ -1,0 +1,72 @@
+[
+    {
+        "manifest_file": "clash-verge-rev.json",
+        "repo": "clash-verge-rev/clash-verge-rev",
+        "asset_keywords": ["x64-setup.exe"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "flclash.json",
+        "repo": "chen08209/FlClash",
+        "asset_keywords": ["windows-amd64-setup.exe"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "GUI-for-Clash.json",
+        "repo": "GUI-for-Cores/GUI.for.Clash",
+        "asset_keywords": ["windows-amd64.zip"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "hiddify-next.json",
+        "repo": "hiddify/hiddify-next",
+        "asset_keywords": ["Hiddify-Windows-Setup-x64.exe"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "mihomo-party.json",
+        "repo": "mihomo-party-org/mihomo-party",
+        "asset_keywords": ["windows", "x64-setup.exe"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "nekoray.json",
+        "repo": "MatsuriDayo/nekoray",
+        "asset_keywords": ["windows64.zip"],
+        "version_strip_prefix": "",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "oblivion-desktop.json",
+        "repo": "bepass-org/oblivion-desktop",
+        "asset_keywords": ["win-x64.exe"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "securednsclient.json",
+        "repo": "msasanmh/DNSveil",
+        "asset_keywords": ["SecureDNSClient", "x64_Installer.exe"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "v2rayn.json",
+        "repo": "2dust/v2rayN",
+        "asset_keywords": ["v2rayN-windows-64.zip"],
+        "version_strip_prefix": "",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "v2rayn-pro.json",
+        "repo": "lowercase78/V2RayN-PRO",
+        "asset_keywords": ["V2rayN-Pro-Desktop.zip"],
+        "version_strip_prefix": "V2RayN-PROV",
+        "allow_prerelease": false
+    }
+]

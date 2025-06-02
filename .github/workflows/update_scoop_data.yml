@@ -1,20 +1,20 @@
-name: Update Scoop Bucket (Python Only for Hashes/README)
+name: Update Scoop Bucket (Two Python Scripts)
 
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '0 2 * * *' # Runs daily at 02:00 UTC
+    - cron: '0 4 * * *' # Runs daily at 04:00 UTC
 
 jobs:
-  update_files_with_python:
-    name: Update Hashes and README via Python
+  update_bucket_and_readme:
+    name: Update Manifests, Hashes, and README
     runs-on: windows-latest
 
     permissions:
       contents: write # Needed to commit changes back to the repository
 
     steps:
-      - name: Checkout Your Bucket Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -22,52 +22,57 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Or your preferred Python version
+          python-version: '3.11' 
 
       - name: Install Python dependencies
         shell: pwsh
         run: |
           Write-Host "[INFO] Installing Python dependencies..."
           python -m pip install --upgrade pip
-          pip install requests # Assuming 'requests' is the only dependency for the Python script
+          pip install requests packaging # 'packaging' is needed by Update-AppVersionsAndUrls.py
           Write-Host "[SUCCESS] Python dependencies installed."
+
+      - name: Run Python script to Update App Versions and URLs
+        id: update_versions_urls
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: UTF-8
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_TOKEN_SCOOP_UPDATER: ${{ secrets.YOUR_REPO_PAT }} # IMPORTANT: Create this secret in your repo
+        run: |
+          Write-Host "[INFO] Running Python script Update-AppVersionsAndUrls.py..."
+          python ./Update-AppVersionsAndUrls.py 
+          Write-Host "[SUCCESS] Update-AppVersionsAndUrls.py script finished."
 
       - name: Run Python script to Update Hashes and README
         id: update_hashes_readme
         shell: pwsh
         env:
-          PYTHONIOENCODING: UTF-8 # Ensures Python handles UTF-8 correctly
-          GITHUB_REPOSITORY: ${{ github.repository }} # Provides repo context to Python script
+          PYTHONIOENCODING: UTF-8
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           Write-Host "[INFO] Running Python script Update-HashesAndReadme.py..."
-          Write-Warning "NOTE: This workflow ONLY updates hashes based on existing URLs in manifests and updates the README."
-          Write-Warning "Automatic version and URL updates via 'scoop checkver' are NOT performed by this CI."
-          Write-Warning "Please ensure manifest versions and URLs are updated manually before pushing if needed."
-          python ./Update-HashesAndReadme.py # Script is expected to be in the repo root
-          Write-Host "[SUCCESS] Python script finished."
+          python ./Update-HashesAndReadme.py 
+          Write-Host "[SUCCESS] Update-HashesAndReadme.py script finished."
 
       - name: Commit and Push Changes
-        shell: bash # Using bash for git commands is common
+        shell: bash
         run: |
           echo "[INFO] --- Starting Commit and Push ---"
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          echo "[DEBUG] Current directory: $(pwd)"
           echo "[INFO] Git Status Before Add:"
           git status
           
-          # Add specific files expected to change by the Python script
           git add bucket/*.json README.md
           
           echo "[INFO] Git Status After Add (Before Commit):"
           git status
 
-          # Check if there are staged changes to commit
           if ! git diff --cached --quiet; then
             echo "[ACTION] Changes detected and staged. Committing and pushing..."
-            # Modified commit message to reflect the current scope
-            git commit -m "Automated: Update app hashes and README (Manual version/URL updates assumed)"
+            git commit -m "Automated: Update app versions, URLs, hashes, and README"
             git push
             echo "[SUCCESS] Changes committed and pushed."
           else
