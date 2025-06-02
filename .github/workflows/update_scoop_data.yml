@@ -18,7 +18,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Scoop Manually and Verify
+      - name: Install Scoop, Update Buckets, and Run Update-ScoopVersions.ps1
         shell: pwsh
         run: |
           Write-Host "Attempting to install Scoop manually..."
@@ -33,78 +33,58 @@ jobs:
           }
           $ErrorActionPreference = "Continue" # Reset error action preference
 
-          if (Test-Path scoop_installer.ps1) {
-            Write-Host "Scoop installer downloaded. Running installer..."
-            # Install to default location and run self-update
-            # Explicitly set SCOOP env var as installer might not set it for current session immediately
-            $env:SCOOP = "$HOME\scoop" 
-            .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir $env:SCOOP
-            Write-Host "Scoop installation script executed."
-            
-            $ScoopShimsPath = Join-Path $env:SCOOP "shims"
-            
-            # Add Scoop shims to GITHUB_PATH for subsequent steps in this job
-            Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
-            Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH."
-
-            # Also add to current session's PATH for immediate use
-            $env:PATH = "$ScoopShimsPath;$env:PATH"
-            Write-Host "Added '$ScoopShimsPath' to current session PATH."
-            Write-Host "Updated PATH: $env:PATH"
-
-            # Verify Scoop immediately
-            Write-Host "Verifying Scoop installation immediately..."
-            scoop --version
-            scoop status
-            
-            # Clean up installer script
-            Remove-Item scoop_installer.ps1 -Force
-            Write-Host "Removed scoop_installer.ps1."
-
-          } else {
+          if (!(Test-Path scoop_installer.ps1)) {
             Write-Error "Scoop installer script (scoop_installer.ps1) not found after download attempt."
             exit 1
           }
 
-      - name: Update Scoop itself and core buckets
-        shell: pwsh
-        run: |
+          Write-Host "Scoop installer downloaded. Running installer..."
+          $env:SCOOP = "$HOME\scoop" # Explicitly set SCOOP env var
+          .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir $env:SCOOP
+          Write-Host "Scoop installation script executed."
+          
+          $ScoopShimsPath = Join-Path $env:SCOOP "shims"
+          
+          # Add Scoop shims to GITHUB_PATH for any *future* steps (though we aim to do most here)
+          Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
+          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH (for potential future steps)."
+
+          # Crucially, add to current session's PATH for immediate use in *this* run block
+          $env:PATH = "$ScoopShimsPath;$env:PATH"
+          Write-Host "Added '$ScoopShimsPath' to current session PATH."
+          Write-Host "Updated PATH for current session: $env:PATH"
+
+          # Verify Scoop immediately in this session
+          Write-Host "Verifying Scoop installation immediately in this session..."
+          scoop --version
+          scoop status
+          
+          # Clean up installer script
+          Remove-Item scoop_installer.ps1 -Force
+          Write-Host "Removed scoop_installer.ps1."
+
+          # --- Update Scoop itself and core buckets ---
           Write-Host "Updating Scoop and core buckets..."
-          # These commands should now work if Scoop PATH is correctly set from previous step
           scoop update scoop
-          scoop bucket rm main # No -ErrorAction needed here due to continue-on-error for step
+          scoop bucket rm main -ErrorAction SilentlyContinue # Okay to fail if not exists
           scoop bucket add main
-          scoop bucket rm extras
+          scoop bucket rm extras -ErrorAction SilentlyContinue # Okay to fail if not exists
           scoop bucket add extras
           scoop update
-        continue-on-error: true # Allows the workflow to continue even if bucket operations fail
+          Write-Host "Scoop and core buckets update process finished."
 
-      - name: Verify Scoop installation and checkver command (again for clarity)
-        shell: pwsh
-        run: |
-          Write-Host "--- Verifying Scoop Installation (Post-Bucket Update) ---"
-          $ScoopExe = Get-Command scoop.exe -ErrorAction SilentlyContinue
-          if ($ScoopExe) {
-            Write-Host "Scoop executable path (from Get-Command): $($ScoopExe.Source)"
-            Write-Host "Scoop Version:"
-            scoop.exe --version
-            Write-Host "Scoop Help (check for checkver):"
-            scoop.exe help checkver
-            Write-Host "Scoop Status:"
-            scoop.exe status
-          } else {
-            Write-Warning "scoop.exe still not found via Get-Command at this stage."
-            Write-Host "Current PATH: $env:PATH"
-          }
-          Write-Host "--- End Verification ---"
-        continue-on-error: true
+          # --- Run PowerShell Script to Update Manifest Versions & URLs ---
+          Write-Host "Running PowerShell Script: ./Update-ScoopVersions.ps1"
+          # Ensure the script is executable if needed, though usually not for .ps1
+          # Get-ChildItem ./Update-ScoopVersions.ps1 | Unblock-File -ErrorAction SilentlyContinue
+          ./Update-ScoopVersions.ps1 -BucketPath "./bucket"
+          Write-Host "Update-ScoopVersions.ps1 script finished."
 
-      - name: Run PowerShell Script to Update Manifest Versions & URLs
-        id: update_versions_urls
-        run: ./Update-ScoopVersions.ps1 -BucketPath "./bucket"
-        shell: pwsh
-        continue-on-error: true
+        # We are not using continue-on-error here for the whole step.
+        # If Scoop install or the main script fails critically, we want the job to reflect that.
+        # Individual scoop commands inside can use -ErrorAction SilentlyContinue if needed.
 
+      # Python steps remain separate as they don't depend on the PowerShell PATH in the same way
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -130,13 +110,11 @@ jobs:
           echo "--- Git Status Before Add ---"
           git status
           
-          # Add only specific files that are expected to change
           git add bucket/*.json README.md
           
           echo "--- Git Status After Add (Before Commit) ---"
           git status
 
-          # Check if there are staged changes to commit
           if ! git diff --cached --quiet; then
             echo "Changes detected and staged, committing and pushing..."
             git commit -m "Automated: Update app manifests, hashes, and README"
