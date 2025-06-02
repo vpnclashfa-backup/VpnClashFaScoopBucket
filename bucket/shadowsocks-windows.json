@@ -1,10 +1,10 @@
-{
+﻿{
     "version": "4.4.1.0",
     "description": "A secure SOCKS5 proxy, designed to protect your Internet traffic.",
     "homepage": "https://github.com/shadowsocks/shadowsocks-windows",
     "license": "Apache-2.0",
     "url": "https://github.com/shadowsocks/shadowsocks-windows/releases/download/4.4.1.0/Shadowsocks-4.4.1.0.zip",
-    "hash": "",
+    "hash": "62b74a688d22bfdf20f673a351580029d7b9de67c6facc9a5613b22b3f798968",
     "bin": "Shadowsocks.exe",
     "shortcuts": [
         [

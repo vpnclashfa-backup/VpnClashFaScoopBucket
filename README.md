@@ -15,18 +15,24 @@ scoop install VpnClashFa/<program-name>
 ## Packages
 
 ```text
-{APP_LIST_START_PLACEHOLDER}
-- GUI-for-Clash
-- clash-verge-rev
-- flclash
-- hiddify-next
-- mihomo-party
-- nekoray
-- oblivion-desktop
-- securednsclient
-- v2rayn
-- v2rayn-pro
-{APP_LIST_END_PLACEHOLDER}
+BegzarWindows
+GUI-for-Clash
+GUI.for.SingBox
+InvisibleMan-XRayClient
+anytls-go
+clash-verge-rev
+defguard-client
+flclash
+hiddify-next
+mieru
+mihomo-party
+nekoray
+oblivion-desktop
+securednsclient
+shadowsocks-windows
+v2rayA
+v2rayn
+v2rayn-pro
 ```
 ---
 می‌توانید وضعیت به‌روزرسانی‌های خودکار این مخزن را در صفحه Actions ما مشاهده کنید:

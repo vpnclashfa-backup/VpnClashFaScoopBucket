@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "3.15.0",
     "description": "A cross-platform async transparent proxy solution that supports multiple protocols.",
     "homepage": "https://github.com/enfein/mieru",
@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/enfein/mieru/releases/download/v3.15.0/mieru_3.15.0_windows_amd64.zip",
-            "hash": ""
+            "hash": "9c2e02f021e4900eb230879d9949cab6e9d8d2b9193d572286456e1afa04dbed"
         }
     },
     "bin": "mieru.exe",
