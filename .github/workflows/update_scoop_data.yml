@@ -1,4 +1,4 @@
-name: Update Scoop Bucket (Manual Scoop Clone)
+name: Update Scoop Bucket (Manual Scoop Clone - Full Branch)
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -18,21 +18,28 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Manually Clone Scoop Source Code
+      - name: Manually Clone Scoop Source Code (Full Master Branch)
         shell: pwsh
         run: |
-          Write-Host "Attempting to manually clone ScoopInstaller/Scoop..."
+          Write-Host "Attempting to manually clone ScoopInstaller/Scoop (master branch, full clone)..."
           $ScoopSourcePath = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
           if (Test-Path $ScoopSourcePath) {
             Write-Host "Removing existing directory: $ScoopSourcePath"
             Remove-Item -Recurse -Force $ScoopSourcePath
           }
-          git clone --depth 1 https://github.com/ScoopInstaller/Scoop.git $ScoopSourcePath
-          Write-Host "Scoop source code cloned to $ScoopSourcePath"
+          # Clone the master branch specifically, without shallow clone
+          git clone --branch master https://github.com/ScoopInstaller/Scoop.git $ScoopSourcePath
+          Write-Host "Scoop source code (master branch) cloned to $ScoopSourcePath"
           if (!(Test-Path $ScoopSourcePath)) {
             Write-Error "CRITICAL FAILURE: Scoop source directory not found after git clone."
             exit 1
           }
+          # Verify .git directory exists to confirm it's a git repo
+          if (!(Test-Path (Join-Path $ScoopSourcePath ".git") -PathType Container)) {
+            Write-Error "CRITICAL FAILURE: .git directory not found in $ScoopSourcePath. Clone might have failed silently or created an empty dir."
+            exit 1
+          }
+          Write-Host "Successfully cloned and .git directory exists."
 
       - name: Diagnostic File Listing for Scoop Source Checkout
         id: diagnostic_listing
@@ -45,12 +52,12 @@ jobs:
             Write-Error "FAILURE (Diagnostic): Scoop source directory '$ScoopSourceDir' does not exist."
             exit 1
           }
-          Write-Host "Top-level contents of '$ScoopSourceDir':"
+          Write-Host "Top-level contents of '$ScoopSourceDir' (Force enumeration):"
           Get-ChildItem -Path $ScoopSourceDir -Depth 0 -Force | ForEach-Object { Write-Output "  L0: $($_.Name) (Mode: $($_.Mode))" }
           
           $ScoopModulesDir = Join-Path $ScoopSourceDir "modules"
           Write-Host "Checking existence of '$ScoopModulesDir': $(Test-Path $ScoopModulesDir -PathType Container)"
-          Write-Host "Contents of '$ScoopModulesDir' (if it exists):"
+          Write-Host "Contents of '$ScoopModulesDir' (if it exists, Force enumeration):"
           Get-ChildItem -Path $ScoopModulesDir -ErrorAction SilentlyContinue -Force | ForEach-Object { Write-Output "  L1-Modules: $($_.Name) (Mode: $($_.Mode), Length: $($_.Length))" }
           
           $ExpectedModuleFile = Join-Path $ScoopModulesDir "scoop.psm1"
@@ -59,7 +66,7 @@ jobs:
             Write-Host "SUCCESS (Diagnostic): '$ExpectedModuleFile' exists."
           } else {
             Write-Error "FAILURE (Diagnostic): '$ExpectedModuleFile' does NOT exist."
-            Write-Host "Deeper listing of '$ScoopSourceDir' (first 2 levels):"
+            Write-Host "Deeper listing of '$ScoopSourceDir' (first 2 levels, Force enumeration):"
             Get-ChildItem -Path $ScoopSourceDir -Recurse -Depth 1 -Force -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.FullName.Replace($env:GITHUB_WORKSPACE, '')) (Mode: $($_.Mode))" }
           }
           Write-Host "--- End Diagnostic ---"
