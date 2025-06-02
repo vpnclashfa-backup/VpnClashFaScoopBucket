@@ -18,17 +18,40 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check GitHub API access for action (Diagnostic)
+      - name: Install Scoop Manually
         shell: pwsh
         run: |
-          Invoke-RestMethod -Uri "https://api.github.com/repos/babochka/setup-scoop/releases/tags/v2.0.1" | Select-Object name, tag_name, published_at | Format-List
-        continue-on-error: true # Continue even if this diagnostic step fails
+          Write-Host "Attempting to install Scoop manually..."
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          try {
+            Invoke-RestMethod -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
+          } catch {
+            Write-Error "Failed to download Scoop installer script. Error: $($_.Exception.Message)"
+            # Fallback to iwr if Invoke-RestMethod fails (less common for this URL)
+            Write-Host "Trying with Invoke-WebRequest..."
+            Invoke-WebRequest -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
+          }
+          
+          if (Test-Path scoop_installer.ps1) {
+            Write-Host "Scoop installer downloaded. Running installer..."
+            # Install to default location: C:\Users\<user>\scoop
+            # The -RunSelfUpdate switch ensures Scoop updates itself immediately after installation.
+            .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir "$HOME\scoop"
+            Write-Host "Scoop installation script executed."
+            
+            # Add Scoop shims to GITHUB_PATH for subsequent steps in this job
+            $ScoopShimsPath = "$HOME\scoop\shims"
+            Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
+            Write-Host "Added $ScoopShimsPath to GITHUB_PATH."
 
-      - name: Setup Scoop using babochka/setup-scoop (with commit SHA)
-        # Using commit SHA for v2.0.1 to bypass potential tag resolution issues
-        uses: babochka/setup-scoop@9babf5750d1f10388009956310791750c618b2a0 
-        id: setup_scoop
-        # This action automatically adds Scoop to PATH
+            # Also add to current session's PATH for immediate use in subsequent run blocks if needed
+            $env:PATH = "$ScoopShimsPath;$env:PATH"
+            Write-Host "Added $ScoopShimsPath to current session PATH."
+
+          } else {
+            Write-Error "Scoop installer script (scoop_installer.ps1) not found after download attempt."
+            exit 1
+          }
 
       - name: Update Scoop itself and core buckets
         shell: pwsh
@@ -46,11 +69,24 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "--- Verifying Scoop Installation ---"
-          Write-Host "Scoop executable path (from Get-Command):"
-          Get-Command scoop.exe -ErrorAction SilentlyContinue | Format-List *
-          Write-Host "Scoop Shims Path (from setup_scoop action output): ${{ steps.setup_scoop.outputs.scoop_shims_path }}"
+          $ScoopExe = Get-Command scoop.exe -ErrorAction SilentlyContinue
+          if ($ScoopExe) {
+            Write-Host "Scoop executable path (from Get-Command): $($ScoopExe.Source)"
+          } else {
+            Write-Warning "scoop.exe not found via Get-Command."
+          }
+          
+          $ExpectedScoopShimsPath = "$HOME\scoop\shims"
+          Write-Host "Expected Scoop Shims Path: $ExpectedScoopShimsPath"
+          if (Test-Path $ExpectedScoopShimsPath) {
+            Write-Host "Expected shims path exists."
+          } else {
+            Write-Warning "Expected shims path DOES NOT exist."
+          }
+
           Write-Host "PATH environment variable:"
           $env:PATH -split ';' | ForEach-Object { Write-Host "  $_" }
+          
           Write-Host "Scoop Version:"
           scoop.exe --version -ErrorAction SilentlyContinue
           Write-Host "Scoop Help (check for checkver):"
