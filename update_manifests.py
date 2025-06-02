@@ -47,7 +47,7 @@ def download_file_from_url(url: str, destination_path: Path) -> bool:
         print(f"    An unexpected error occurred during download from '{url}': {e}")
         return False
 
-def update_readme_file( # This is the correct function name and signature
+def update_readme_file( 
     readme_file_path_param: Path,
     list_of_app_names_param: list[str],
     bucket_name_for_display_param: str,
@@ -172,21 +172,20 @@ def main():
             
             print(f"Running 'scoop checkver \"{name_of_app}\" -u'...")
             try:
-                ps_command_to_run_checkver = f"""
-                $ProgressPreference = 'SilentlyContinue' # Suppress progress bars from Invoke-WebRequest if scoop uses it
-                scoop checkver '{name_of_app}' -u
-                """
-                scoop_checkver_command_line = ["pwsh", "-NoProfile", "-Command", ps_command_to_run_checkver.strip()]
-                scoop_checkver_result = subprocess.run( 
-                    scoop_checkver_command_line, capture_output=True, text=True, check=False, encoding='utf-8', errors='replace'
+                # PowerShell command to run. -NoProfile was removed.
+                ps_command_for_checkver = f"$ProgressPreference = 'SilentlyContinue'; scoop checkver '{name_of_app}' -u"
+                scoop_checkver_command_line_args = ["pwsh", "-Command", ps_command_for_checkver.strip()] # Removed -NoProfile
+                
+                scoop_checkver_execution_result = subprocess.run( 
+                    scoop_checkver_command_line_args, capture_output=True, text=True, check=False, encoding='utf-8', errors='replace'
                 )
-                if scoop_checkver_result.returncode != 0:
-                    print(f"  Warning: Command `scoop checkver '{name_of_app}' -u` finished with exit code {scoop_checkver_result.returncode}.")
-                    if scoop_checkver_result.stdout and scoop_checkver_result.stdout.strip(): print(f"    Scoop Checkver STDOUT:\n{scoop_checkver_result.stdout.strip()}")
-                    if scoop_checkver_result.stderr and scoop_checkver_result.stderr.strip(): print(f"    Scoop Checkver STDERR:\n{scoop_checkver_result.stderr.strip()}")
+                if scoop_checkver_execution_result.returncode != 0:
+                    print(f"  Warning: Command `scoop checkver '{name_of_app}' -u` finished with exit code {scoop_checkver_execution_result.returncode}.")
+                    if scoop_checkver_execution_result.stdout and scoop_checkver_execution_result.stdout.strip(): print(f"    Scoop Checkver STDOUT:\n{scoop_checkver_execution_result.stdout.strip()}")
+                    if scoop_checkver_execution_result.stderr and scoop_checkver_execution_result.stderr.strip(): print(f"    Scoop Checkver STDERR:\n{scoop_checkver_execution_result.stderr.strip()}")
                 else:
                     print(f"  'scoop checkver -u' for '{name_of_app}' executed successfully (or no update was needed).")
-                    if scoop_checkver_result.stdout and scoop_checkver_result.stdout.strip(): print(f"    Scoop Checkver Output:\n{scoop_checkver_result.stdout.strip()}")
+                    if scoop_checkver_execution_result.stdout and scoop_checkver_execution_result.stdout.strip(): print(f"    Scoop Checkver Output:\n{scoop_checkver_execution_result.stdout.strip()}")
             except FileNotFoundError:
                 print("  Error: 'pwsh' (PowerShell) not found. Cannot run 'scoop checkver'.")
             except Exception as e:
@@ -200,16 +199,16 @@ def main():
                 any_file_actually_changed_in_run = True; continue
 
             app_download_link = None; hash_value_from_json = None 
-            keys_to_reach_hash = [] 
+            keys_to_reach_hash_in_json = [] 
 
             if manifest_data_as_object.get("architecture", {}).get("64bit", {}).get("url"):
                 app_download_link = manifest_data_as_object["architecture"]["64bit"]["url"]
                 hash_value_from_json = manifest_data_as_object["architecture"]["64bit"].get("hash")
-                keys_to_reach_hash = ["architecture", "64bit", "hash"]
+                keys_to_reach_hash_in_json = ["architecture", "64bit", "hash"]
             elif manifest_data_as_object.get("url"):
                 app_download_link = manifest_data_as_object["url"]
                 hash_value_from_json = manifest_data_as_object.get("hash")
-                keys_to_reach_hash = ["hash"]
+                keys_to_reach_hash_in_json = ["hash"]
             
             if not app_download_link:
                 print(f"  Warning: 'url' field not found or empty in manifest '{name_of_app}'. Skipping hash update.")
@@ -219,58 +218,57 @@ def main():
             print(f"  Download URL found: {app_download_link}")
             print(f"  Current hash in manifest: {hash_value_from_json}")
 
-            temp_download_directory = repository_root_directory / "temp_scoop_downloads_python_final_v2" 
-            temp_download_directory.mkdir(exist_ok=True)
-            original_url_filename = os.path.basename(app_download_link.split('?')[0]) 
-            sanitized_temp_filename = "".join(c if c.isalnum() or c in ['.', '-', '_'] else '_' for c in original_url_filename) 
-            if not sanitized_temp_filename: sanitized_temp_filename = "downloaded_asset_file" 
-            full_path_for_temporary_file = temp_download_directory / f"{name_of_app}_{sanitized_temp_filename}.tmp" 
+            temp_download_dir_path = repository_root_directory / "temp_scoop_downloads_python_final_v3" 
+            temp_download_dir_path.mkdir(exist_ok=True)
+            original_filename_from_url = os.path.basename(app_download_link.split('?')[0]) 
+            sanitized_temporary_filename = "".join(c if c.isalnum() or c in ['.', '-', '_'] else '_' for c in original_filename_from_url) 
+            if not sanitized_temporary_filename: sanitized_temporary_filename = "downloaded_asset_file_default_name" 
+            full_path_to_temporary_downloaded_file = temp_download_dir_path / f"{name_of_app}_{sanitized_temporary_filename}.tmp" 
 
-            download_was_ok = download_file_from_url(app_download_link, full_path_for_temporary_file) 
-            newly_calculated_actual_hash = None 
+            download_operation_was_successful = download_file_from_url(app_download_link, full_path_to_temporary_downloaded_file) 
+            newly_calculated_file_hash = None 
 
-            if download_was_ok:
-                newly_calculated_actual_hash = calculate_sha256_hash(full_path_for_temporary_file)
-                if newly_calculated_actual_hash:
-                    print(f"  New calculated hash for '{name_of_app}': {newly_calculated_actual_hash}")
+            if download_operation_was_successful:
+                newly_calculated_file_hash = calculate_sha256_hash(full_path_to_temporary_downloaded_file)
+                if newly_calculated_file_hash:
+                    print(f"  New calculated hash for '{name_of_app}': {newly_calculated_file_hash}")
             
-            if full_path_for_temporary_file.exists():
+            if full_path_to_temporary_downloaded_file.exists():
                 try:
-                    os.remove(full_path_for_temporary_file)
+                    os.remove(full_path_to_temporary_downloaded_file)
                 except Exception as e_rm_temp:
-                    print(f"    Warning: Could not remove temporary file {full_path_for_temporary_file}: {e_rm_temp}")
+                    print(f"    Warning: Could not remove temporary file {full_path_to_temporary_downloaded_file}: {e_rm_temp}")
             
-            if temp_download_directory.exists() and not any(temp_download_directory.iterdir()):
+            if temp_download_dir_path.exists() and not any(temp_download_dir_path.iterdir()): # Remove if empty
                  try:
-                     temp_download_directory.rmdir()
+                     temp_download_dir_path.rmdir()
                  except Exception as e_rm_dir:
-                     print(f"    Warning: Could not remove temporary directory {temp_download_directory}: {e_rm_dir}")
+                     print(f"    Warning: Could not remove temporary directory {temp_download_dir_path}: {e_rm_dir}")
 
-
-            manifest_file_needs_saving_due_to_hash_update = False 
-            if newly_calculated_actual_hash and hash_value_from_json != newly_calculated_actual_hash:
-                print(f"  New hash ({newly_calculated_actual_hash}) for '{name_of_app}' differs from current manifest hash ({hash_value_from_json}). Updating hash...")
+            manifest_file_updated_due_to_hash = False 
+            if newly_calculated_file_hash and hash_value_from_json != newly_calculated_file_hash:
+                print(f"  New hash ({newly_calculated_file_hash}) for '{name_of_app}' differs from current manifest hash ({hash_value_from_json}). Updating hash...")
                 
-                target_dictionary_for_update = manifest_data_as_object 
-                if keys_to_reach_hash == ["architecture", "64bit", "hash"]:
-                    if "architecture" in target_dictionary_for_update and "64bit" in target_dictionary_for_update["architecture"]:
-                        target_dictionary_for_update["architecture"]["64bit"]["hash"] = newly_calculated_actual_hash
-                        manifest_file_needs_saving_due_to_hash_update = True
-                elif keys_to_reach_hash == ["hash"]:
-                    if "hash" in target_dictionary_for_update or hash_value_from_json is not None :
-                        target_dictionary_for_update["hash"] = newly_calculated_actual_hash
-                        manifest_file_needs_saving_due_to_hash_update = True
+                target_dictionary_to_update = manifest_data_as_object 
+                if keys_to_reach_hash_in_json == ["architecture", "64bit", "hash"]:
+                    if "architecture" in target_dictionary_to_update and "64bit" in target_dictionary_to_update["architecture"]:
+                        target_dictionary_to_update["architecture"]["64bit"]["hash"] = newly_calculated_file_hash
+                        manifest_file_updated_due_to_hash = True
+                elif keys_to_reach_hash_in_json == ["hash"]:
+                    if "hash" in target_dictionary_to_update or hash_value_from_json is not None :
+                        target_dictionary_to_update["hash"] = newly_calculated_file_hash
+                        manifest_file_updated_due_to_hash = True
                 
-                if not manifest_file_needs_saving_due_to_hash_update and (keys_to_reach_hash == ["architecture", "64bit", "hash"] or keys_to_reach_hash == ["hash"]):
+                if not manifest_file_updated_due_to_hash and (keys_to_reach_hash_in_json == ["architecture", "64bit", "hash"] or keys_to_reach_hash_in_json == ["hash"]):
                      print(f"  Warning: Hash key structure issue in manifest '{name_of_app}'. Hash not updated.")
 
-            elif newly_calculated_actual_hash:
+            elif newly_calculated_file_hash:
                 print(f"  Calculated hash for '{name_of_app}' is identical to the hash in the manifest. No hash update needed.")
             else:
                 print(f"  Hash for '{name_of_app}' was not updated due to previous download/calculation errors.")
                 any_file_actually_changed_in_run = True 
 
-            if manifest_file_needs_saving_due_to_hash_update:
+            if manifest_file_updated_due_to_hash:
                  try:
                     with open(single_manifest_file, 'w', encoding='utf-8') as f: 
                         json.dump(manifest_data_as_object, f, indent=4, ensure_ascii=False)
@@ -285,25 +283,25 @@ def main():
             print("---------------------------")
 
     # --- Update README.md ---
-    github_repository_env_variable_value = os.environ.get("GITHUB_REPOSITORY") 
-    bucket_name_to_display_in_readme = "VpnClashFa" 
-    repo_address_for_readme_file = "vpnclashfa-backup/VpnClashFaScoopBucket" 
+    github_repo_full_name_from_env = os.environ.get("GITHUB_REPOSITORY") 
+    user_preferred_bucket_name_for_readme = "VpnClashFa" 
+    actual_repo_address_for_readme = "vpnclashfa-backup/VpnClashFaScoopBucket" 
 
-    if github_repository_env_variable_value: 
-        repo_name_parts_from_env = github_repository_env_variable_value.split('/') 
-        if len(repo_name_parts_from_env) == 2:
-            repo_address_for_readme_file = github_repository_env_variable_value
-            # bucket_name_to_display_in_readme = repo_name_parts_from_env[1] # Keep VpnClashFa as requested
+    if github_repo_full_name_from_env: 
+        repo_name_parts_from_github_env = github_repo_full_name_from_env.split('/') 
+        if len(repo_name_parts_from_github_env) == 2:
+            actual_repo_address_for_readme = github_repo_full_name_from_env
+            # Keep user_preferred_bucket_name_for_readme as VpnClashFa, as requested
     else: 
         try:
-            git_origin_url_command_result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=False, encoding='utf-8', errors='replace') 
-            if git_origin_url_command_result.returncode == 0:
-                git_origin_url_string_value = git_origin_url_command_result.stdout.strip() 
-                url_regex_match_object = re.search(r'github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?$', git_origin_url_string_value) 
-                if url_regex_match_object:
-                    git_repo_owner_name, git_repo_actual_name_val = url_regex_match_object.groups() 
-                    repo_address_for_readme_file = f"{git_repo_owner_name}/{git_repo_actual_name_val}"
-                    # bucket_name_to_display_in_readme = git_repo_actual_name_val # Keep VpnClashFa
+            git_remote_origin_url_process_result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=False, encoding='utf-8', errors='replace') 
+            if git_remote_origin_url_process_result.returncode == 0:
+                git_remote_origin_url_as_string = git_remote_origin_url_process_result.stdout.strip() 
+                url_regex_match_result_object = re.search(r'github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?$', git_remote_origin_url_as_string) 
+                if url_regex_match_result_object:
+                    git_repository_owner, git_repository_name = url_regex_match_result_object.groups() 
+                    actual_repo_address_for_readme = f"{git_repository_owner}/{git_repository_name}"
+                    # Keep user_preferred_bucket_name_for_readme as VpnClashFa
                 else:
                     print("Warning: Could not parse GitHub repository name from git remote URL for README.")
             else:
@@ -311,15 +309,15 @@ def main():
         except Exception as e:
             print(f"Warning: Could not determine repository info from git for README: {e}. Using default README info.")
 
-    readme_file_was_actually_modified = update_readme_file( 
+    readme_was_modified_by_script = update_readme_file( 
         readme_file_full_path, 
         list_of_processed_app_names, 
-        bucket_name_to_display_in_readme, 
-        repo_address_for_readme_file
+        user_preferred_bucket_name_for_readme, 
+        actual_repo_address_for_readme
     )
 
     print("\n=========================================================")
-    if any_file_actually_changed_in_run or readme_file_was_actually_modified :
+    if any_file_actually_changed_in_run or readme_was_modified_by_script :
         print("Update operation completed. Some files may have been modified or errors occurred.")
     else:
         print("Update operation for all manifests completed successfully (or no changes were needed).")

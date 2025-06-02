@@ -21,7 +21,7 @@ jobs:
           # این توکن به طور خودکار توسط گیت‌هاب برای هر اجرای اکشن فراهم می‌شود.
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Scoop # مرحله ۲: نصب و آماده‌سازی Scoop در محیط اجرایی اکشن
+      - name: Setup Scoop # مرحله ۲: نصب و آماده‌سازی Scoop
         uses: MinoruSekine/setup-scoop@v1
         # پارامتر scoop_branch دیگر برای این اکشن لازم یا پشتیبانی نمی‌شود
 

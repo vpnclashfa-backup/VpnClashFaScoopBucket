@@ -8,7 +8,7 @@
 برای اضافه کردن این مخزن (Bucket) به Scoop خود و استفاده از نرم‌افزارهای آن، دستور زیر را در PowerShell اجرا کنید:
 
 ```powershell
-scoop bucket add VpnClashFa https://github.com/vpnclashfa-backup/VpnClashFaScoopBucket.git
+scoop bucket add VpnClashFa [https://github.com/vpnclashfa-backup/VpnClashFaScoopBucket.git](https://github.com/vpnclashfa-backup/VpnClashFaScoopBucket.git)
 scoop install VpnClashFa/<program-name>
 ```
 
