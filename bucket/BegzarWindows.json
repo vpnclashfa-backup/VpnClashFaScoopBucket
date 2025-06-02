@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "1.0.7-beta",
     "description": "A Windows client for Begzar.",
     "homepage": "https://github.com/Begzar/BegzarWindows",
@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/Begzar/BegzarWindows/releases/download/v1.0.7-beta/Begzar-Windows-x64.zip",
-            "hash": ""
+            "hash": "35b37491ced91a277e5ffd7eaf574ba145aeb8522c7aa5f6dc6a81ae1f990aa8"
         }
     },
     "bin": "BegzarWindows.exe",
