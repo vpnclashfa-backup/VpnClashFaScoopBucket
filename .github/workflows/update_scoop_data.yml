@@ -1,4 +1,4 @@
-name: Update Scoop Bucket (Download Scoop Archive)
+name: Update Scoop Bucket (Download Scoop ZIP Archive)
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -18,12 +18,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download and Extract Scoop Source Code
+      - name: Download and Extract Scoop Source Code (ZIP)
         shell: pwsh
         run: |
           $ScoopSourcePath = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
-          $ScoopArchiveUrl = "https://github.com/ScoopInstaller/Scoop/archive/refs/heads/master.tar.gz"
-          $ScoopArchivePath = "$env:GITHUB_WORKSPACE\scoop_master.tar.gz"
+          $ScoopArchiveUrl = "https://github.com/ScoopInstaller/Scoop/archive/refs/heads/master.zip" # Using .zip archive
+          $ScoopArchivePath = "$env:GITHUB_WORKSPACE\scoop_master.zip"
 
           Write-Host "Attempting to download Scoop source archive from $ScoopArchiveUrl..."
           try {
@@ -41,13 +41,20 @@ jobs:
           New-Item -ItemType Directory -Path $ScoopSourcePath -Force | Out-Null
           
           Write-Host "Attempting to extract archive $ScoopArchivePath to $ScoopSourcePath..."
-          # tar is available on Windows runners provided by GitHub
-          tar -xzf $ScoopArchivePath -C $ScoopSourcePath --strip-components=1 
-          # The --strip-components=1 is because GitHub archives usually have a top-level folder like Scoop-master/
+          try {
+            Expand-Archive -Path $ScoopArchivePath -DestinationPath "$env:GITHUB_WORKSPACE\scoop_temp_extract" -Force
+            # GitHub ZIP archives usually have a top-level folder like 'Scoop-master'. We need to move its contents.
+            $ExtractedFolderName = (Get-ChildItem "$env:GITHUB_WORKSPACE\scoop_temp_extract" | Select-Object -First 1).Name
+            Move-Item -Path "$env:GITHUB_WORKSPACE\scoop_temp_extract\$ExtractedFolderName\*" -Destination $ScoopSourcePath -Force
+            Remove-Item "$env:GITHUB_WORKSPACE\scoop_temp_extract" -Recurse -Force
+            Write-Host "Scoop source code extracted to $ScoopSourcePath"
+          } catch {
+            Write-Error "CRITICAL FAILURE: Failed to extract Scoop source archive. Error: $($_.Exception.Message)"
+            exit 1
+          }
           
-          Write-Host "Scoop source code extracted to $ScoopSourcePath"
           if (!(Test-Path $ScoopSourcePath)) {
-            Write-Error "CRITICAL FAILURE: Scoop source directory not found after extraction."
+            Write-Error "CRITICAL FAILURE: Scoop source directory '$ScoopSourcePath' not found after extraction."
             exit 1
           }
           Remove-Item $ScoopArchivePath -Force
