@@ -1,0 +1,60 @@
+name: Update Scoop Manifests and README (Python)
+
+on:
+  workflow_dispatch: # Allows manual triggering from the Actions tab
+  schedule:
+    - cron: '30 16 * * *' # Runs daily at 16:30 UTC (approximately 8:00 PM Tehran time)
+
+jobs:
+  update_manifests:
+    runs-on: windows-latest 
+
+    permissions:
+      contents: write 
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Scoop
+        uses: MinoruSekine/setup-scoop@v1
+
+      - name: Add Scoop shims to PATH # Ensure scoop command is available to subsequent steps
+        run: echo "$HOME\scoop\shims" | Add-Content -Path $env:GITHUB_PATH
+        shell: pwsh
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' 
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+        shell: pwsh 
+
+      - name: Run Python script to update manifests and README
+        id: run_update_script 
+        env:
+          PYTHONIOENCODING: UTF-8 
+          GITHUB_REPOSITORY: ${{ github.repository }} 
+        run: python update_manifests.py # Assumes script is in the repo root
+        shell: pwsh
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if ! git diff --quiet HEAD; then
+            echo "Changes detected, committing and pushing..."
+            git add bucket/*.json README.md 
+            git commit -m "Automated: Update app manifests and README (Python)"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+        shell: bash 
