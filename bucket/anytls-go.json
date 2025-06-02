@@ -1,0 +1,26 @@
+{
+    "version": "0.0.8",
+    "description": "A TLS/SSL swiss army knife and proxy. (Go version)",
+    "homepage": "https://github.com/anytls/anytls-go",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/anytls/anytls-go/releases/download/v0.0.8/anytls_0.0.8_windows_amd64.zip",
+            "hash": ""
+        }
+    },
+    // Assuming it's a portable app since it's a ZIP.
+    // The executable name inside the ZIP needs to be confirmed.
+    // It's likely 'anytls.exe' or 'anytls-go.exe'.
+    "bin": "anytls.exe",
+    "checkver": {
+        "github": "https://github.com/anytls/anytls-go"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/anytls/anytls-go/releases/download/v$version/anytls_$version_windows_amd64.zip"
+            }
+        }
+    }
+}

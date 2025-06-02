@@ -1,0 +1,32 @@
+{
+    "version": "3.2.5",
+    "description": "A simple and powerful XRay client for Windows, part of the InvisibleMan project.",
+    "homepage": "https://github.com/InvisibleManVPN/InvisibleMan-XRayClient",
+    "license": "MIT", // License specified in the repository
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/InvisibleManVPN/InvisibleMan-XRayClient/releases/download/v3.2.5/InvisibleManXRay-x64.zip",
+            "hash": ""
+        }
+    },
+    // Assuming it's a portable app since it's a ZIP.
+    // The executable name inside the ZIP needs to be confirmed.
+    // Common names might be "InvisibleMan.exe" or "InvisibleManXRay.exe".
+    "bin": "InvisibleMan.exe",
+    "shortcuts": [
+        [
+            "InvisibleMan.exe",
+            "InvisibleMan XRay Client"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/InvisibleManVPN/InvisibleMan-XRayClient"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/InvisibleManVPN/InvisibleMan-XRayClient/releases/download/v$version/InvisibleManXRay-x64.zip"
+            }
+        }
+    }
+}

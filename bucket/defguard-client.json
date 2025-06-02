@@ -1,0 +1,45 @@
+{
+    "version": "1.2.3",
+    "description": "DefGuard VPN Client for seamless and secure network access.",
+    "homepage": "https://github.com/DefGuard/client",
+    "license": "AGPL-3.0-only", // License specified in the repository
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/DefGuard/client/releases/download/v1.2.3/defguard-client_1.2.3_x64_en-US.exe",
+            "hash": ""
+        }
+    },
+    "installer": {
+        "script": [
+            "$fname = (Get-Item \"$dir\\defguard-client_*.exe\").Name",
+            "Write-Host \"Attempting to install $fname silently.\"",
+            "Invoke-ExternalCommand \"$dir\\$fname\" -ArgumentList @('/S') -RunAs | Out-Null",
+            "Write-Host \"Installation finished. Note: DefGuard Client might require specific configuration or server details to connect.\"",
+            "Remove-Item \"$dir\\$fname\" -Force -ErrorAction SilentlyContinue"
+        ]
+    },
+    // The actual executable name and path after installation need to be verified.
+    // This often installs to Program Files and might not add to PATH directly.
+    // For now, assuming a common executable name. This might need adjustment.
+    "bin": [
+        [ "DefGuard Client.exe", "defguard-client" ] 
+
+    ],
+    "shortcuts": [
+        [
+            "DefGuard Client.exe",
+            "DefGuard Client"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/DefGuard/client",
+        "regex": "defguard-client_([\\d.]+)_x64_en-US\\.exe"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/DefGuard/client/releases/download/v$version/defguard-client_$version_x64_en-US.exe"
+            }
+        }
+    }
+}

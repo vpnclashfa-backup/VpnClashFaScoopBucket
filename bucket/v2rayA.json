@@ -1,0 +1,51 @@
+{
+    "version": "2.2.6.7",
+    "description": "A web GUI client of Project V which supports V2Ray, Xray, SS, SSR, Trojan and Pingtunnel.",
+    "homepage": "https://github.com/v2rayA/v2rayA",
+    "license": "AGPL-3.0-only",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/v2rayA/v2rayA/releases/download/v2.2.6.7/installer_windows_inno_x64_2.2.6.7.exe",
+            "hash": ""
+        }
+    },
+    "installer": {
+        "script": [
+            "$fname = (Get-Item \"$dir\\installer_windows_inno_x64_*.exe\").Name",
+            "Write-Host \"Attempting to install $fname silently to $dir\"",
+            "Invoke-ExternalCommand \"$dir\\$fname\" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', \"/DIR=`\"$dir`\"\") -RunAs | Out-Null",
+            "Write-Host \"Installation finished. Checking for v2rayA.exe...\"",
+            "if (-not (Test-Path \"$dir\\v2rayA.exe\")) {",
+            "    Write-Warning \"v2rayA.exe not found in $dir after installation. Installation might have failed or installed to a different location.\"",
+            "    # Attempt to find common installation paths if default fails, though Inno /DIR should work.",
+            "    # This part might need adjustment based on actual install behavior if /DIR is not respected perfectly.",
+            "}",
+            "# Clean up the installer file after successful installation attempt",
+            "Remove-Item \"$dir\\$fname\" -Force -ErrorAction SilentlyContinue"
+        ]
+    },
+    "post_install": [
+        "Write-Host 'v2rayA usually requires manual configuration after installation.'",
+        "Write-Host 'It might start a service or require manual start. Check documentation: https://v2raya.org/'"
+    ],
+    "bin": "v2rayA.exe",
+    "shortcuts": [
+        [
+            "v2rayA.exe",
+            "v2rayA"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/v2rayA/v2rayA",
+        "regex": "/v([\\d.]+)/installer_windows_inno_x64_([\\d.]+)\\.exe" 
+        // This regex assumes the version is in the tag and filename consistently for the x64 installer.
+        // GitHub API method (used by your Python script) is generally more robust.
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/v2rayA/v2rayA/releases/download/v$version/installer_windows_inno_x64_$version.exe"
+            }
+        }
+    }
+}

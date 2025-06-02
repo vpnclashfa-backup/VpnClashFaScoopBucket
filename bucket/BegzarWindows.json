@@ -1,0 +1,29 @@
+{
+    "version": "1.0.7-beta",
+    "description": "A Windows client for Begzar.",
+    "homepage": "https://github.com/Begzar/BegzarWindows",
+    "license": "Unknown",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/Begzar/BegzarWindows/releases/download/v1.0.7-beta/Begzar-Windows-x64.zip",
+            "hash": ""
+        }
+    },
+    "bin": "BegzarWindows.exe",
+    "shortcuts": [
+        [
+            "BegzarWindows.exe",
+            "Begzar Windows Client"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/Begzar/BegzarWindows"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/Begzar/BegzarWindows/releases/download/v$version/Begzar-Windows-x64.zip"
+            }
+        }
+    }
+}

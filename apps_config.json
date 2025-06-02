@@ -58,7 +58,7 @@
     {
         "manifest_file": "v2rayn.json",
         "repo": "2dust/v2rayN",
-        "asset_keywords": ["v2rayN-windows-64.zip"],
+        "asset_keywords": ["v2rayN-windows-64.zip"], 
         "version_strip_prefix": "",
         "allow_prerelease": false
     },
@@ -67,6 +67,62 @@
         "repo": "lowercase78/V2RayN-PRO",
         "asset_keywords": ["V2rayN-Pro-Desktop.zip"],
         "version_strip_prefix": "V2RayN-PROV",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "v2rayA.json",
+        "repo": "v2rayA/v2rayA",
+        "asset_keywords": ["installer_windows_inno_x64", ".exe"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "GUI.for.SingBox.json",
+        "repo": "GUI-for-Cores/GUI.for.SingBox",
+        "asset_keywords": ["windows-amd64.zip"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "InvisibleMan-XRayClient.json",
+        "repo": "InvisibleManVPN/InvisibleMan-XRayClient",
+        "asset_keywords": ["x64.zip"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "defguard-client.json",
+        "repo": "DefGuard/client",
+        "asset_keywords": ["x64_en-US.exe"], 
+        "version_strip_prefix": "v",        
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "mieru.json",
+        "repo": "enfein/mieru",
+        "asset_keywords": ["windows_amd64.zip"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "shadowsocks-windows.json",
+        "repo": "shadowsocks/shadowsocks-windows",
+        "asset_keywords": [".zip"],
+        "version_strip_prefix": "", 
+        "allow_prerelease": false
+    },
+    {
+        "manifest_file": "BegzarWindows.json",
+        "repo": "Begzar/BegzarWindows",
+        "asset_keywords": ["x64.zip"],
+        "version_strip_prefix": "v",
+        "allow_prerelease": true 
+    },
+    {
+        "manifest_file": "anytls-go.json",
+        "repo": "anytls/anytls-go",
+        "asset_keywords": ["windows_amd64.zip"],
+        "version_strip_prefix": "v",
         "allow_prerelease": false
     }
 ]
