@@ -2,7 +2,7 @@
     "version": "1.2.3",
     "description": "DefGuard VPN Client for seamless and secure network access.",
     "homepage": "https://github.com/DefGuard/client",
-    "license": "AGPL-3.0-only", // License specified in the repository
+    "license": "AGPL-3.0-only",
     "architecture": {
         "64bit": {
             "url": "https://github.com/DefGuard/client/releases/download/v1.2.3/defguard-client_1.2.3_x64_en-US.exe",
@@ -18,9 +18,6 @@
             "Remove-Item \"$dir\\$fname\" -Force -ErrorAction SilentlyContinue"
         ]
     },
-    // The actual executable name and path after installation need to be verified.
-    // This often installs to Program Files and might not add to PATH directly.
-    // For now, assuming a common executable name. This might need adjustment.
     "bin": [
         [ "DefGuard Client.exe", "defguard-client" ] 
 

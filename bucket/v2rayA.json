@@ -38,8 +38,6 @@
     "checkver": {
         "github": "https://github.com/v2rayA/v2rayA",
         "regex": "/v([\\d.]+)/installer_windows_inno_x64_([\\d.]+)\\.exe" 
-        // This regex assumes the version is in the tag and filename consistently for the x64 installer.
-        // GitHub API method (used by your Python script) is generally more robust.
     },
     "autoupdate": {
         "architecture": {

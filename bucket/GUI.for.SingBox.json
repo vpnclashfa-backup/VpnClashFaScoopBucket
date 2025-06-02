@@ -2,17 +2,13 @@
     "version": "1.9.7",
     "description": "A graphical user interface for SingBox.",
     "homepage": "https://github.com/GUI-for-Cores/GUI.for.SingBox",
-    "license": "GPL-3.0-only", // Assuming GPL-3.0 based on other GUI-for-Cores projects, verify if different
+    "license": "GPL-3.0-only",
     "architecture": {
         "64bit": {
             "url": "https://github.com/GUI-for-Cores/GUI.for.SingBox/releases/download/v1.9.7/GUI.for.SingBox-windows-amd64.zip",
             "hash": ""
         }
     },
-    // Since it's a ZIP, it might just contain the executable and other files, not an installer.
-    // If it's a portable app, the 'bin' and 'shortcuts' entries are usually sufficient.
-    // If there's an installer inside the ZIP, the installer script would be needed.
-    // Assuming it's portable for now:
     "bin": "GUI.for.SingBox.exe",
     "shortcuts": [
         [
@@ -22,9 +18,6 @@
     ],
     "checkver": {
         "github": "https://github.com/GUI-for-Cores/GUI.for.SingBox"
-        // Regex might be complex if version is not directly in asset name,
-        // but your Python script uses API which is more reliable.
-        // "regex": "GUI.for.SingBox-windows-amd64.zip"
     },
     "autoupdate": {
         "architecture": {

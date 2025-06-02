@@ -9,9 +9,6 @@
             "hash": ""
         }
     },
-    // Assuming it's a portable app since it's a ZIP.
-    // The executable name inside the ZIP needs to be confirmed.
-    // It's likely 'anytls.exe' or 'anytls-go.exe'.
     "bin": "anytls.exe",
     "checkver": {
         "github": "https://github.com/anytls/anytls-go"

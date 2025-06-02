@@ -1,4 +1,4 @@
-name: Update Scoop Bucket (Two Python Scripts)
+name: Update Scoop Bucket (Two Python Scripts with Correct PAT)
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' 
+          python-version: '3.11' # Using a recent Python version
 
       - name: Install Python dependencies
         shell: pwsh
@@ -38,10 +38,10 @@ jobs:
         env:
           PYTHONIOENCODING: UTF-8
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_API_TOKEN_SCOOP_UPDATER: ${{ secrets.YOUR_REPO_PAT }} # IMPORTANT: Create this secret in your repo
+          GH_API_TOKEN: ${{ secrets.SCOOP_UPDATER_PAT }} # Using your specified secret name
         run: |
           Write-Host "[INFO] Running Python script Update-AppVersionsAndUrls.py..."
-          python ./Update-AppVersionsAndUrls.py 
+          python ./Update-AppVersionsAndUrls.py # Script that checks versions and URLs
           Write-Host "[SUCCESS] Update-AppVersionsAndUrls.py script finished."
 
       - name: Run Python script to Update Hashes and README
@@ -50,9 +50,10 @@ jobs:
         env:
           PYTHONIOENCODING: UTF-8
           GITHUB_REPOSITORY: ${{ github.repository }}
+          # GH_API_TOKEN is not strictly needed by Update-HashesAndReadme.py unless it also makes API calls
         run: |
           Write-Host "[INFO] Running Python script Update-HashesAndReadme.py..."
-          python ./Update-HashesAndReadme.py 
+          python ./Update-HashesAndReadme.py # Script that updates hashes and README
           Write-Host "[SUCCESS] Update-HashesAndReadme.py script finished."
 
       - name: Commit and Push Changes
