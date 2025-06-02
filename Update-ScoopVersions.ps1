@@ -46,7 +46,10 @@ foreach ($ManifestFile in $ManifestFiles) {
 
     try {
         Write-Output "  Running 'scoop checkver `"$AppName`" -u'..."
-        $ProcessOutput = scoop checkver "$AppName" -u *>&1 
+        # Using scoop.exe explicitly can sometimes help in constrained environments,
+        # but generally not needed if shims are in PATH correctly.
+        # If issues persist, you could try: $ProcessOutput = scoop.exe checkver "$AppName" -u *>&1
+        $ProcessOutput = scoop checkver "$AppName" -u *>&1  
         
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "  'scoop checkver -u' for '$AppName' may have finished with warnings or an error (Exit Code: $LASTEXITCODE)."

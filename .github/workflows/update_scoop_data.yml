@@ -1,4 +1,4 @@
-﻿name: Update Scoop Bucket (Multi-Script)
+name: Update Scoop Bucket (Multi-Script)
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -25,12 +25,20 @@ jobs:
         run: echo "$HOME\scoop\shims" | Add-Content -Path $env:GITHUB_PATH
         shell: pwsh
 
+      - name: Update Scoop and add/update essential buckets
+        run: |
+          scoop update scoop
+          scoop bucket add main # Ensure main bucket is present
+          scoop bucket add extras # Extras bucket often contains useful utilities
+          scoop update # Update all buckets
+        shell: pwsh
+        continue-on-error: true # Continue if a bucket add fails (e.g. already exists)
+
       - name: Run PowerShell Script to Update Manifest Versions & URLs
         id: update_versions_urls
         run: ./Update-ScoopVersions.ps1 -BucketPath "./bucket"
         shell: pwsh
-        # Continue even if some checkver commands fail, Python script will handle current state
-        continue-on-error: true 
+        continue-on-error: true # Python script will handle current state
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,7 +54,7 @@ jobs:
         env:
           PYTHONIOENCODING: UTF-8
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python Update-HashesAndReadme.py # Python script will use "./bucket" as default
+        run: python Update-HashesAndReadme.py
         shell: pwsh
 
       - name: Commit and Push Changes
