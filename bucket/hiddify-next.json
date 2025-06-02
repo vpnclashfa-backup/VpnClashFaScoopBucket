@@ -11,14 +11,13 @@
     },
     "installer": {
         "script": [
-            "# $fname به نام فایل exe دانلود شده در پوشه $dir اشاره دارد (Hiddify-Windows-Setup-x64.exe)",
             "Write-Host \"Attempting to install $fname silently to $dir\"",
             "$processOptions = @{",
-            "    FilePath     = \"$dir\\$fname\"",
-            "    ArgumentList = @('/S', \"/D=`\"$dir`\"\")", "# <<< سویچ‌های نصب بی‌صدا، نیاز به تست و بررسی دقیق دارد!",
-            "    Wait         = $true",
-            "    PassThru     = $true",
-            "    Verb         = 'RunAs' # برای اجرای نصب‌کننده با دسترسی ادمین اگر لازم باشد",
+            "    FilePath       = \"$dir\\$fname\"",
+            "    ArgumentList = @('/S', \"/D=`\"$dir`\"\")",
+            "    Wait           = $true",
+            "    PassThru       = $true",
+            "    Verb           = 'RunAs'",
             "}",
             "$process = Start-Process @processOptions",
             "if ($process.ExitCode -ne 0) {",
@@ -42,7 +41,6 @@
         "architecture": {
             "64bit": {
                 "url": "https://github.com/hiddify/hiddify-next/releases/download/v$version/Hiddify-Windows-Setup-x64.exe"
-                // هش فایل هم باید با هر آپدیت به صورت دستی یا با مکانیزم دیگری آپدیت شود
             }
         }
     }

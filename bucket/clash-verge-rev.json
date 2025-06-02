@@ -1,4 +1,4 @@
-﻿{
+{
     "version":  "2.2.3",
     "description":  "A Clash GUI based on tauri. Supports Windows, macOS and Linux.",
     "homepage":  "https://github.com/clash-verge-rev/clash-verge-rev",
