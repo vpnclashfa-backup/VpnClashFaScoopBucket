@@ -25,7 +25,7 @@ jobs:
           repository: ScoopInstaller/Scoop 
           path: scoop_source_checkout # Checks out to $GITHUB_WORKSPACE/scoop_source_checkout
           ref: master # Explicitly use master branch for stability
-          # fetch-depth: 0 # Uncomment for full history if needed, default is 1 for actions/checkout@v4
+          fetch-depth: 0 # Fetch all history for all branches and tags, ensuring all files are present
 
       - name: Diagnostic File Listing for Scoop Source Checkout
         id: diagnostic_listing
@@ -49,6 +49,10 @@ jobs:
             Write-Host "SUCCESS (Diagnostic): '$ExpectedModuleFile' exists."
           } else {
             Write-Error "FAILURE (Diagnostic): '$ExpectedModuleFile' does NOT exist."
+            # List contents of scoop_source_checkout again with recurse to see more detail
+            Write-Host "Deeper listing of '$ScoopSourceDir' (first 2 levels):"
+            Get-ChildItem -Path $ScoopSourceDir -Recurse -Depth 1 -Force -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.FullName.Replace($env:GITHUB_WORKSPACE, '')) (Mode: $($_.Mode))" }
+            # exit 1 # Consider re-enabling exit 1 if this step is critical to debug before others
           }
           Write-Host "--- End Diagnostic ---"
 
@@ -68,12 +72,11 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value $ScoopSourceBinPath
           Write-Host "Added '$ScoopSourceBinPath' to GITHUB_PATH."
           
-          # This check is now somewhat redundant if the diagnostic step passes, but kept for safety
           $ScoopModulePathFromSource = Join-Path $env:SCOOP_HOME "modules\scoop.psm1"
           Write-Host "Verifying Module Path (in main script block): $ScoopModulePathFromSource"
           if (!(Test-Path $ScoopModulePathFromSource -PathType Leaf)) {
             Write-Error "CRITICAL FAILURE (in main script block): Scoop module file '$ScoopModulePathFromSource' NOT FOUND."
-            Write-Host "This suggests an issue with file visibility or persistence between steps, or the checkout failed to retrieve it."
+            Write-Host "This suggests the checkout of ScoopInstaller/Scoop did not correctly retrieve the 'modules' directory."
             exit 1
           }
           Write-Output "SUCCESS (in main script block): Scoop module file FOUND at '$ScoopModulePathFromSource'."
