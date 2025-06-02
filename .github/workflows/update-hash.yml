@@ -1,64 +1,67 @@
 name: Update Scoop Manifests and README (Python)
 
 on:
-  workflow_dispatch: # Allows manual triggering from the Actions tab
+  workflow_dispatch: # به شما اجازه می‌دهد اکشن را به صورت دستی از طریق تب Actions در گیت‌هاب اجرا کنید
   schedule:
-    - cron: '30 16 * * *' # Runs daily at 16:30 UTC (approximately 8:00 PM Tehran time)
+    - cron: '30 16 * * *' # هر روز ساعت 16:30 UTC (حدوداً ۸ شب به وقت تهران، با توجه به ساعت تابستانی ممکن است کمی تغییر کند)
 
 jobs:
   update_manifests:
-    runs-on: windows-latest # Run on a Windows virtual machine
+    runs-on: windows-latest # این کار بر روی یک ماشین مجازی ویندوزی اجرا می‌شود
 
-    # Grant permissions for the GITHUB_TOKEN to commit and push changes
+    # دسترسی‌های لازم برای GITHUB_TOKEN برای کامیت و پوش کردن تغییرات به ریپازیتوری
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Repository # Step 1: Check out your repository's code
+      - name: Checkout Repository # مرحله ۱: کد مخزن شما را به ماشین مجازی اکشن می‌آورد
         uses: actions/checkout@v4
         with:
-          # Using GITHUB_TOKEN for operations like push.
-          # This token is automatically provided by GitHub.
+          # استفاده از GITHUB_TOKEN برای عملیاتی مثل push کردن تغییرات.
+          # این توکن به طور خودکار توسط گیت‌هاب برای هر اجرای اکشن فراهم می‌شود.
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Scoop # Step 2: Install and prepare Scoop
+      - name: Setup Scoop # مرحله ۲: نصب و آماده‌سازی Scoop در محیط اجرایی اکشن
         uses: MinoruSekine/setup-scoop@v1
-        # The 'scoop_branch' input is no longer needed for this action
+        # پارامتر scoop_branch دیگر برای این اکشن لازم یا پشتیبانی نمی‌شود
 
-      - name: Set up Python # Step 3: Install a specific version of Python
+      - name: Set up Python # مرحله ۳: نصب نسخه مشخصی از پایتون
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Or any other Python 3.x version you prefer
+          python-version: '3.10' # می‌توانید از نسخه دیگری از پایتون ۳ که ترجیح می‌دهید استفاده کنید
 
-      - name: Install Python dependencies # Step 4: Install Python libraries needed by your script
+      - name: Install Python dependencies # مرحله ۴: نصب کتابخانه‌های پایتون مورد نیاز اسکریپت شما
         run: |
           python -m pip install --upgrade pip
-          pip install requests # 'requests' library is used for downloading files in the Python script
-        shell: pwsh # Run these commands using PowerShell
+          pip install requests # کتابخانه requests برای دانلود فایل‌ها در اسکریپت پایتون استفاده می‌شود
+        shell: pwsh # اجرای این دستورات با استفاده از PowerShell
 
-      - name: Run Python script to update manifests # Step 5: Execute your Python script
-        id: run_update_script # An optional ID for this step
+      - name: Run Python script to update manifests # مرحله ۵: اجرای اسکریپت پایتون شما
+        id: run_update_script # یک شناسه اختیاری برای این مرحله
         env:
-          PYTHONIOENCODING: UTF-8 # Ensures Python uses UTF-8 for its standard input/output
-          GITHUB_REPOSITORY: ${{ github.repository }} # Makes the repository name available to your script
-        run: python update_manifests.py # Assumes your script is in the root of the repository
-        shell: pwsh
+          PYTHONIOENCODING: UTF-8 # اطمینان از اینکه پایتون از UTF-8 برای ورودی/خروجی استاندارد خود استفاده می‌کند
+          GITHUB_REPOSITORY: ${{ github.repository }} # نام ریپازیتوری را در دسترس اسکریپت پایتون قرار می‌دهد
+        run: python update_manifests.py # فرض بر این است که اسکریپت شما (update_manifests.py) در ریشه ریپازیتوری قرار دارد
+        shell: pwsh # اجرای اسکریپت پایتون با PowerShell (که پایتون را از PATH پیدا می‌کند)
 
-      - name: Commit and Push Changes # Step 6: Commit and push any changes made by the script
+      - name: Commit and Push Changes # مرحله ۶: کامیت و پوش کردن تغییرات در صورت وجود
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Check if there are any changes to commit
-          # `git diff --quiet HEAD` exits with 1 if there are uncommitted changes, 0 otherwise.
+          # بررسی می‌کند آیا تغییری برای کامیت کردن وجود دارد یا نه
+          # git diff --quiet HEAD اگر تغییری نباشد با کد 0 خارج می‌شود، در غیر این صورت با کد 1
           if ! git diff --quiet HEAD; then
             echo "Changes detected, committing and pushing..."
-            # Add all .json files in the bucket directory and the README.md
-            # This ensures only expected files are committed.
+            # فقط فایل‌های مانیفست داخل پوشه bucket و فایل README.md را اضافه می‌کند
+            # این کار از اضافه شدن ناخواسته فایل‌های دیگر (مثل فایل‌های موقت) جلوگیری می‌کند
             git add bucket/*.json README.md 
             git commit -m "Automated: Update app manifests and README (Python)"
-            git push
+            # اگر کامیت به خاطر اینکه هیچ فایلی add نشده ناموفق بود (مثلاً اگر README.md و پوشه bucket وجود نداشتند یا تغییری نکرده بودند)،
+            # با || true از فیل شدن این مرحله جلوگیری نمی‌کنیم.
+            # اما اگر git add چیزی را اضافه کرده باشد و کامیت انجام شود، پوش انجام می‌شود.
+            git push || echo "No effective changes to push, or push failed for other reasons." 
           else
             echo "No changes to commit."
           fi
-        shell: bash # Git commands are often more conveniently run in a bash shell in actions
+        shell: bash # دستورات گیت معمولاً در شل bash در اکشن‌ها راحت‌تر و قابل اطمینان‌تر اجرا می‌شوند
