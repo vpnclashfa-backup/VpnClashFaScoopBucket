@@ -7,61 +7,51 @@ on:
 
 jobs:
   update_manifests:
-    runs-on: windows-latest # ماشین مجازی ویندوزی که معمولاً Scoop و PowerShell رو داره
+    runs-on: windows-latest # ماشین مجازی ویندوزی
 
-    # دسترسی‌های لازم برای GITHUB_TOKEN برای کامیت و پوش کردن تغییرات
     permissions:
-      contents: write
+      contents: write # اجازه نوشتن برای کامیت و پوش کردن تغییرات
 
     steps:
-      - name: Checkout Repository # مرحله ۱: دانلود کد مخزن شما به ماشین مجازی اکشن
+      - name: Checkout Repository # قدم ۱: دانلود کد مخزن شما
         uses: actions/checkout@v4
         with:
-          # استفاده از GITHUB_TOKEN برای عملیاتی مثل push کردن تغییرات.
-          # این توکن به طور خودکار توسط گیت‌هاب فراهم می‌شه.
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Scoop # مرحله ۲: نصب و آماده‌سازی Scoop در محیط اجرایی اکشن
-        uses: MinoruSekine/setup-scoop@v1 # استفاده از یک اکشن آماده و معتبر برای نصب Scoop
-        with:
-          scoop_branch: 'master' # می‌توانید از 'develop' هم استفاده کنید اگر به آخرین ویژگی‌های Scoop نیاز دارید
+      - name: Setup Scoop # قدم ۲: نصب و آماده‌سازی Scoop
+        uses: MinoruSekine/setup-scoop@v1
+        # پارامتر scoop_branch دیگر پشتیبانی نمی‌شود و حذف شده است
 
-      - name: Set up Python # مرحله ۳: نصب نسخه مشخصی از پایتون
+      - name: Set up Python # قدم ۳: نصب پایتون
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # یا هر نسخه دیگری از پایتون ۳ که ترجیح می‌دهید
+          python-version: '3.10'
 
-      - name: Install Python dependencies # مرحله ۴: نصب کتابخانه‌های پایتون مورد نیاز اسکریپت
+      - name: Install Python dependencies # قدم ۴: نصب کتابخانه‌های پایتون
         run: |
           python -m pip install --upgrade pip
-          pip install requests # کتابخانه requests برای دانلود فایل‌ها استفاده می‌شود
-        shell: pwsh # اجرای دستورات با PowerShell
+          pip install requests
+        shell: pwsh
 
-      - name: Run Python script to update manifests # مرحله ۵: اجرای اسکریپت پایتون شما
-        id: run_update_script # یک شناسه برای این مرحله (اختیاری)
+      - name: Run Python script to update manifests # قدم ۵: اجرای اسکریپت پایتون شما
+        id: run_update_script
+        env:
+          PYTHONIOENCODING: UTF-8 # <--- این خط برای حل مشکل انکودینگ در خروجی پایتون اضافه شده
+          GITHUB_REPOSITORY: ${{ github.repository }} # برای دسترسی اسکریپت به نام ریپازیتوری
         run: python update_manifests.py # فرض بر این است که اسکریپت در ریشه ریپازیتوری قرار دارد
         shell: pwsh
-        # اسکریپت پایتون خودش باید خطاهایش رو مدیریت کنه و پیغام‌های مناسب چاپ کنه.
-        # اگر اسکریپت پایتون با کد خطای غیر صفر خارج بشه، این مرحله (و در نتیجه کل job) فیل می‌شه.
 
-      - name: Commit and Push Changes # مرحله ۶: کامیت و پوش کردن تغییرات در صورت وجود
+      - name: Commit and Push Changes # قدم ۶: کامیت و پوش کردن تغییرات
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # بررسی می‌کنه آیا تغییری برای کامیت کردن وجود داره یا نه
-          # git diff --quiet HEAD اگر تغییری نباشه با کد 0 خارج می‌شه، در غیر این صورت با کد 1
           if ! git diff --quiet HEAD; then
             echo "Changes detected, committing and pushing..."
-            # فقط فایل‌های مانیفست داخل پوشه bucket و فایل README.md رو اضافه می‌کنه
-            # این کار از اضافه شدن ناخواسته فایل‌های دیگه جلوگیری می‌کنه
             git add bucket/*.json README.md 
             git commit -m "Automated: Update app manifests and README (Python)"
-            # اگر کامیت به خاطر اینکه هیچ فایلی add نشده ناموفق بود (مثلاً اگر README.md و پوشه bucket وجود نداشتن)،
-            # با || true از فیل شدن این مرحله جلوگیری می‌کنیم، چون ممکنه واقعاً تغییری نبوده.
-            # اما اگر git add چیزی رو اضافه کرده باشه و کامیت انجام بشه، پوش انجام می‌شه.
-            git push || echo "No effective changes to push or push failed." 
+            git push
           else
             echo "No changes to commit."
           fi
-        shell: bash # دستورات گیت معمولاً در شل bash در اکشن‌ها راحت‌تر اجرا می‌شن
+        shell: bash

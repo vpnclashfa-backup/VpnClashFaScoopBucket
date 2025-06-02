@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/hiddify/hiddify-next/releases/download/v2.0.5/Hiddify-Windows-Setup-x64.exe",
-            "hash": "SHA256_HASH_را_اینجا_وارد_کنید"
+            "hash": ""
         }
     },
     "installer": {
