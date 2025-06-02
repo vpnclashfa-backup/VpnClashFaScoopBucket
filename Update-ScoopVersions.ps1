@@ -5,58 +5,54 @@ param (
     [string]$BucketPath = "./bucket",
 
     [Parameter(Mandatory=$true)] 
-    [string]$ProvidedScoopShimsPath = "" 
+    [string]$ProvidedScoopShimsPath # This path is used to derive $env:SCOOP
 )
 
-Write-Output "Script Version: v7_final (Uses 'scoop' command after PATH modification)"
+Write-Output "Script Version: v8_final_direct_call (Calls main scoop.ps1 directly)"
 Write-Output "Provided BucketPath: $BucketPath"
-Write-Output "Provided ScoopShimsPath: $ProvidedScoopShimsPath"
+Write-Output "Provided ScoopShimsPath from workflow: $ProvidedScoopShimsPath"
 
-# Step 1: Validate the provided shims path and add it to this script's session PATH
+# Step 1: Determine the main Scoop installation directory ($env:SCOOP)
+# The shims path is typically $SCOOP\shims. So, $SCOOP is the parent of shims path.
 if (-not [string]::IsNullOrWhiteSpace($ProvidedScoopShimsPath)) {
-    Write-Output "Validating provided shims path: '$ProvidedScoopShimsPath'"
     if (Test-Path $ProvidedScoopShimsPath -PathType Container) {
-        Write-Output "Provided shims path '$ProvidedScoopShimsPath' exists and is a directory."
-        # Prepend the shims path to the current script's session PATH
-        # This is crucial for PowerShell to find 'scoop' (which resolves to scoop.ps1 or scoop.cmd)
-        if ($env:PATH -notlike "$ProvidedScoopShimsPath*") { # Add only if not already at the start (or present)
-            $env:PATH = "$ProvidedScoopShimsPath;$($env:PATH)"
-            Write-Output "SUCCESS: Prepended '$ProvidedScoopShimsPath' to this script's session PATH."
-        } else {
-            Write-Output "Provided shims path '$ProvidedScoopShimsPath' seems to be already in PATH."
-        }
-        Write-Output "Current script session PATH (first 200 chars): $($env:PATH.Substring(0, [System.Math]::Min($env:PATH.Length, 200)))..."
+        $env:SCOOP = Split-Path $ProvidedScoopShimsPath
+        Write-Output "Derived \$env:SCOOP as: $($env:SCOOP)"
     } else {
-        Write-Error "CRITICAL: Provided Scoop Shims Path '$ProvidedScoopShimsPath' does NOT exist or is not a directory. Cannot proceed."
+        Write-Error "CRITICAL: Provided Scoop Shims Path '$ProvidedScoopShimsPath' does NOT exist or is not a directory. Cannot derive \$env:SCOOP."
         exit 1
     }
 } else {
-    Write-Error "CRITICAL: No ScoopShimsPath was provided to the script. This is required."
+    Write-Error "CRITICAL: No ScoopShimsPath was provided to the script. This is required to locate main Scoop script."
     exit 1
 }
 
-# Step 2: Verify 'scoop' command is now resolvable using Get-Command
-Write-Output "--------------------------------------------------------------------"
-Write-Output "Verifying 'scoop' command availability using Get-Command..."
-$ScoopCmdInfo = Get-Command scoop -ErrorAction SilentlyContinue # Look for 'scoop' without extension
-if ($ScoopCmdInfo) {
-    Write-Output "SUCCESS: 'scoop' command resolved by Get-Command to: $($ScoopCmdInfo.Source) (Type: $($ScoopCmdInfo.CommandType))"
-} else {
-    Write-Error "CRITICAL FAILURE: 'scoop' command could NOT be resolved by Get-Command even after PATH modification. Cannot proceed."
-    Write-Output "For debugging - Final PATH directories in this script's scope:"
-    $env:PATH -split ';' | ForEach-Object { Write-Output "  - $_" }
-    exit 1 
+# Step 2: Construct the path to the main scoop.ps1 script
+$MainScoopScriptPath = Join-Path $env:SCOOP "apps\scoop\current\bin\scoop.ps1"
+Write-Output "Attempting to use main Scoop script at: $MainScoopScriptPath"
+
+if (!(Test-Path $MainScoopScriptPath -PathType Leaf)) {
+    Write-Error "CRITICAL FAILURE: Main Scoop script '$MainScoopScriptPath' not found. Scoop installation might be incomplete or \$env:SCOOP is incorrect."
+    Write-Output "For debugging - Contents of '$($env:SCOOP)\apps\scoop\current\bin\':"
+    Get-ChildItem (Join-Path $env:SCOOP "apps\scoop\current\bin\") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)"}
+    exit 1
 }
 
-# Optional: Ensure SCOOP env var is set, and attempt module import
-Write-Verbose "Ensuring \$env:SCOOP is sensible..."
-$env:SCOOP = Split-Path $ProvidedScoopShimsPath 
-Write-Output "Set \$env:SCOOP to: $($env:SCOOP)"
+Write-Output "SUCCESS: Main Scoop script found at '$MainScoopScriptPath'."
+Write-Output "--------------------------------------------------------------------"
+
+# Optional: Attempt to import Scoop module. This might help with cmdlet availability if scoop.ps1 relies on it.
 $ScoopModulePath = Join-Path $env:SCOOP "apps\scoop\current\modules\scoop.psm1"
 if (Test-Path $ScoopModulePath) {
-    try { Import-Module $ScoopModulePath -ErrorAction SilentlyContinue; Write-Verbose "Attempted Scoop module import."}
-    catch { Write-Warning "Scoop module import failed: $($_.Exception.Message)"}
-} else { Write-Verbose "Scoop module not found at '$ScoopModulePath'."}
+    try { 
+        Import-Module $ScoopModulePath -ErrorAction Stop # Use Stop to see if import itself is an issue
+        Write-Output "Successfully imported Scoop module from '$ScoopModulePath'."
+    } catch { 
+        Write-Warning "Could not import Scoop module from '$ScoopModulePath'. Error: $($_.Exception.Message). Proceeding with direct script call."
+    }
+} else { 
+    Write-Warning "Scoop module not found at '$ScoopModulePath' (this might be okay for direct script call)."
+}
 Write-Output "--------------------------------------------------------------------"
 
 $ManifestFiles = Get-ChildItem -Path $BucketPath -Filter "*.json" -File -ErrorAction SilentlyContinue
@@ -71,9 +67,9 @@ foreach ($ManifestFile in $ManifestFiles) {
     Write-Output "" 
     Write-Output "Processing: $AppName (File: $($ManifestFile.Name))"
     try {
-        # Now, simply call 'scoop' - PowerShell should find it via the modified PATH
-        Write-Output "  Running: scoop checkver '$AppName' -u"
-        $ProcessOutput = scoop checkver "$AppName" -u *>&1 
+        # Call the main scoop.ps1 script directly using the call operator '&'
+        Write-Output "  Running: & '$MainScoopScriptPath' checkver '$AppName' -u"
+        $ProcessOutput = & $MainScoopScriptPath checkver "$AppName" -u *>&1 
         
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "  Scoop checkver for '$AppName' finished with Exit Code: $LASTEXITCODE."
@@ -98,4 +94,4 @@ if ($GlobalSuccess) {
 } else {
     Write-Warning "Manifest version and URL update process encountered UNEXPECTED SCRIPT errors."
 }
-Write-Output "Script Update-ScoopVersions.ps1 (v7_final) finished."
+Write-Output "Script Update-ScoopVersions.ps1 (v8_final_direct_call) finished."
