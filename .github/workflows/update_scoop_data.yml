@@ -1,16 +1,16 @@
-name: Update Scoop Manifests and README (Python)
+﻿name: Update Scoop Bucket (Multi-Script)
 
 on:
-  workflow_dispatch: # Allows manual triggering from the Actions tab
+  workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '30 16 * * *' # Runs daily at 16:30 UTC (approximately 8:00 PM Tehran time)
+    - cron: '30 16 * * *' # Daily at 16:30 UTC (approx 8 PM Tehran time)
 
 jobs:
-  update_manifests:
-    runs-on: windows-latest 
+  update_bucket_files:
+    runs-on: windows-latest
 
     permissions:
-      contents: write 
+      contents: write # Needed to commit changes back to the repository
 
     steps:
       - name: Checkout Repository
@@ -21,27 +21,32 @@ jobs:
       - name: Setup Scoop
         uses: MinoruSekine/setup-scoop@v1
 
-      - name: Add Scoop shims to PATH # Ensure scoop command is available to subsequent steps
+      - name: Add Scoop shims to PATH (for subsequent PowerShell steps)
         run: echo "$HOME\scoop\shims" | Add-Content -Path $env:GITHUB_PATH
         shell: pwsh
+
+      - name: Run PowerShell Script to Update Manifest Versions & URLs
+        id: update_versions_urls
+        run: ./Update-ScoopVersions.ps1 -BucketPath "./bucket"
+        shell: pwsh
+        # Continue even if some checkver commands fail, Python script will handle current state
+        continue-on-error: true 
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' 
+          python-version: '3.10'
 
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-        shell: pwsh 
+        run: python -m pip install --upgrade pip && pip install requests
+        shell: pwsh
 
-      - name: Run Python script to update manifests and README
-        id: run_update_script 
+      - name: Run Python script to Update Hashes and README
+        id: update_hashes_readme
         env:
-          PYTHONIOENCODING: UTF-8 
-          GITHUB_REPOSITORY: ${{ github.repository }} 
-        run: python update_manifests.py # Assumes script is in the repo root
+          PYTHONIOENCODING: UTF-8
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python Update-HashesAndReadme.py # Python script will use "./bucket" as default
         shell: pwsh
 
       - name: Commit and Push Changes
@@ -51,10 +56,10 @@ jobs:
           
           if ! git diff --quiet HEAD; then
             echo "Changes detected, committing and pushing..."
-            git add bucket/*.json README.md 
-            git commit -m "Automated: Update app manifests and README (Python)"
+            git add bucket/*.json README.md
+            git commit -m "Automated: Update app manifests, hashes, and README"
             git push
           else
             echo "No changes to commit."
           fi
-        shell: bash 
+        shell: bash
