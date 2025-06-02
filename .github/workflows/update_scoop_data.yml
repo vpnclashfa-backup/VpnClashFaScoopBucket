@@ -16,14 +16,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }} # Ensures the action can push changes
 
       - name: Install Scoop, Update Buckets, and Run Update-ScoopVersions.ps1
+        id: scoop_operations # Added an ID to this step for potential future reference
         shell: pwsh
         run: |
           Write-Host "Attempting to install Scoop manually..."
           Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-          $ErrorActionPreference = "Stop" # Stop on first error for this block
+          $ErrorActionPreference = "Stop" # Stop on first error for critical download/install part
           try {
             Invoke-RestMethod -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
           } catch {
@@ -31,7 +32,7 @@ jobs:
             Write-Host "Trying with Invoke-WebRequest..."
             Invoke-WebRequest -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
           }
-          $ErrorActionPreference = "Continue" # Reset error action preference
+          $ErrorActionPreference = "Continue" # Reset error action preference for subsequent commands
 
           if (!(Test-Path scoop_installer.ps1)) {
             Write-Error "Scoop installer script (scoop_installer.ps1) not found after download attempt."
@@ -39,27 +40,29 @@ jobs:
           }
 
           Write-Host "Scoop installer downloaded. Running installer..."
-          $env:SCOOP = "$HOME\scoop" # Explicitly set SCOOP env var
+          $env:SCOOP = "$HOME\scoop" # Explicitly set SCOOP env var for the installer and current session
+          # Ensure the Scoop directory exists before trying to install into it
+          if (-not (Test-Path $env:SCOOP)) {
+            New-Item -ItemType Directory -Path $env:SCOOP -Force | Out-Null
+          }
           .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir $env:SCOOP
           Write-Host "Scoop installation script executed."
           
           $ScoopShimsPath = Join-Path $env:SCOOP "shims"
           Write-Host "Determined Scoop Shims Path: $ScoopShimsPath"
           
-          # Add Scoop shims to GITHUB_PATH for any *future* steps
-          # This ensures if other PowerShell steps are added later, they might pick it up.
+          # Add Scoop shims to GITHUB_PATH for any *future* separate steps in this job
           Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
-          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH (for potential future steps)."
+          Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH."
 
-          # Crucially, add to current session's PATH for immediate use in *this* run block
-          # Ensure it's added only once to avoid excessive duplication if script runs multiple times in theory
+          # Add to current session's PATH for immediate use in *this* run block
           if ($env:PATH -notlike "*$ScoopShimsPath*") {
             $env:PATH = "$ScoopShimsPath;$env:PATH"
             Write-Host "Added '$ScoopShimsPath' to current session PATH."
           } else {
-            Write-Host "'$ScoopShimsPath' already in current session PATH."
+            Write-Host "'$ScoopShimsPath' was already in current session PATH."
           }
-          Write-Host "Updated PATH for current session: $env:PATH"
+          Write-Host "Current session PATH (first 200 chars): $($env:PATH.Substring(0, [System.Math]::Min($env:PATH.Length, 200)))..."
 
           # Verify Scoop immediately in this session
           Write-Host "Verifying Scoop installation immediately in this session..."
@@ -76,30 +79,41 @@ jobs:
           scoop bucket add main
           scoop bucket rm extras -ErrorAction SilentlyContinue 
           scoop bucket add extras
-          scoop update
+          scoop update # Update all known buckets
           Write-Host "Scoop and core buckets update process finished."
 
           # --- Run PowerShell Script to Update Manifest Versions & URLs ---
-          Write-Host "Running PowerShell Script: ./Update-ScoopVersions.ps1 with Shims Path parameter"
+          $ScriptPath = "./Update-ScoopVersions.ps1"
+          Write-Host "Running PowerShell Script: $ScriptPath with Shims Path parameter"
+          if (!(Test-Path $ScriptPath)) {
+            Write-Error "Update-ScoopVersions.ps1 not found at $ScriptPath"
+            exit 1
+          }
           # Pass the determined $ScoopShimsPath to the script
-          ./Update-ScoopVersions.ps1 -BucketPath "./bucket" -ProvidedScoopShimsPath $ScoopShimsPath
-          Write-Host "Update-ScoopVersions.ps1 script finished."
+          & $ScriptPath -BucketPath "./bucket" -ProvidedScoopShimsPath $ScoopShimsPath
+          # Check $LASTEXITCODE from the script if critical, otherwise rely on script's error handling
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Update-ScoopVersions.ps1 script finished with exit code $LASTEXITCODE."
+            # Decide if this should be a job-failing error. For now, it continues.
+          } else {
+            Write-Host "Update-ScoopVersions.ps1 script finished successfully."
+          }
 
       # Python steps remain separate
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.10' # Or your preferred Python version
 
       - name: Install Python dependencies
         run: python -m pip install --upgrade pip && pip install requests
-        shell: pwsh
+        shell: pwsh # Using pwsh for consistency, though cmd/bash would also work
 
       - name: Run Python script to Update Hashes and README
         id: update_hashes_readme
         env:
-          PYTHONIOENCODING: UTF-8
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          PYTHONIOENCODING: UTF-8 # Ensures Python handles UTF-8 correctly
+          GITHUB_REPOSITORY: ${{ github.repository }} # Provides repo context to Python script
         run: python Update-HashesAndReadme.py
         shell: pwsh
 
@@ -111,11 +125,14 @@ jobs:
           echo "--- Git Status Before Add ---"
           git status
           
+          # Add specific files expected to change.
+          # Use 'git add -A' if you want to add all changes (including new files not matching pattern).
           git add bucket/*.json README.md
           
           echo "--- Git Status After Add (Before Commit) ---"
           git status
 
+          # Check if there are staged changes to commit
           if ! git diff --cached --quiet; then
             echo "Changes detected and staged, committing and pushing..."
             git commit -m "Automated: Update app manifests, hashes, and README"
@@ -123,4 +140,4 @@ jobs:
           else
             echo "No staged changes to commit."
           fi
-        shell: bash
+        shell: bash # Using bash for git commands is common and robust
