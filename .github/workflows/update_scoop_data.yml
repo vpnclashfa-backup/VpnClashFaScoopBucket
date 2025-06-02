@@ -1,9 +1,9 @@
-name: Update Scoop Bucket (Download Scoop ZIP Archive - Enhanced Logging)
+name: Update Scoop Bucket (Manual Scoop App Overwrite)
 
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '0 23 * * *' # Runs daily at 23:00 UTC
+    - cron: '0 0 * * *' # Runs daily at 00:00 UTC
 
 jobs:
   update_bucket_files:
@@ -18,158 +18,138 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download and Extract Scoop Source Code (ZIP)
-        shell: pwsh
-        run: |
-          $ScoopSourceCheckoutPath = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
-          $ScoopArchiveUrl = "https://github.com/ScoopInstaller/Scoop/archive/refs/heads/master.zip"
-          $ScoopArchivePath = "$env:GITHUB_WORKSPACE\scoop_master.zip"
-          $TempExtractPath = "$env:GITHUB_WORKSPACE\scoop_temp_extract_dir"
-
-          Write-Host "[INFO] --- Starting Scoop Source Download and Extraction ---"
-          Write-Host "[INFO] Target Scoop Source Checkout Path: $ScoopSourceCheckoutPath"
-          Write-Host "[INFO] Scoop Archive URL: $ScoopArchiveUrl"
-          Write-Host "[INFO] Temporary Archive Path: $ScoopArchivePath"
-          Write-Host "[INFO] Temporary Extraction Path: $TempExtractPath"
-
-          Write-Host "[ACTION] Attempting to download Scoop source archive from $ScoopArchiveUrl..."
-          try {
-            Invoke-WebRequest -Uri $ScoopArchiveUrl -OutFile $ScoopArchivePath
-            Write-Host "[SUCCESS] Scoop source archive downloaded to $ScoopArchivePath"
-          } catch {
-            Write-Error "[CRITICAL] Failed to download Scoop source archive. Error: $($_.Exception.Message)"
-            exit 1
-          }
-
-          # Ensure clean target and temp directories
-          if (Test-Path $ScoopSourceCheckoutPath) {
-            Write-Host "[ACTION] Removing existing target directory: $ScoopSourceCheckoutPath"
-            Remove-Item -Recurse -Force $ScoopSourceCheckoutPath
-            Write-Host "[SUCCESS] Removed existing target directory."
-          }
-          New-Item -ItemType Directory -Path $ScoopSourceCheckoutPath -Force | Out-Null
-          Write-Host "[SUCCESS] Ensured target directory exists: $ScoopSourceCheckoutPath"
-          
-          if (Test-Path $TempExtractPath) {
-            Write-Host "[ACTION] Removing existing temp extract directory: $TempExtractPath"
-            Remove-Item -Recurse -Force $TempExtractPath
-            Write-Host "[SUCCESS] Removed existing temp extract directory."
-          }
-          New-Item -ItemType Directory -Path $TempExtractPath -Force | Out-Null
-          Write-Host "[SUCCESS] Ensured temp extract directory exists: $TempExtractPath"
-          
-          Write-Host "[ACTION] Attempting to extract archive $ScoopArchivePath to $TempExtractPath..."
-          try {
-            Expand-Archive -Path $ScoopArchivePath -DestinationPath $TempExtractPath -Force
-            Write-Host "[SUCCESS] Archive extracted to $TempExtractPath"
-
-            $ExtractedItems = Get-ChildItem -Path $TempExtractPath
-            Write-Host "[DEBUG] Items found in $TempExtractPath after extraction: $($ExtractedItems.Count)"
-            $ExtractedItems | ForEach-Object { Write-Host "[DEBUG]   - $($_.Name) (IsContainer: $($_.PSIsContainer))" }
-
-            if ($ExtractedItems.Count -eq 1 -and $ExtractedItems[0].PSIsContainer) {
-                $TopLevelFolderNameInZip = $ExtractedItems[0].FullName
-                Write-Host "[INFO] Detected single top-level folder in ZIP: $TopLevelFolderNameInZip."
-                Write-Host "[ACTION] Moving contents from '$TopLevelFolderNameInZip' to '$ScoopSourceCheckoutPath'..."
-                Move-Item -Path (Join-Path $TopLevelFolderNameInZip "*") -Destination $ScoopSourceCheckoutPath -Force
-            } elseif ($ExtractedItems.Count -gt 0) {
-                Write-Host "[INFO] Multiple items or no single top-level folder detected."
-                Write-Host "[ACTION] Moving all items from '$TempExtractPath' to '$ScoopSourceCheckoutPath'..."
-                Move-Item -Path (Join-Path $TempExtractPath "*") -Destination $ScoopSourceCheckoutPath -Force
-            } else {
-                Write-Warning "[WARNING] No items found in $TempExtractPath after extraction. This is unexpected."
-            }
-            Write-Host "[SUCCESS] Scoop source code content moved/processed for $ScoopSourceCheckoutPath"
-          } catch {
-            Write-Error "[CRITICAL] Failed to extract or move Scoop source archive contents. Error: $($_.Exception.Message)"
-            exit 1
-          } finally {
-            if (Test-Path $TempExtractPath) {
-              Remove-Item $TempExtractPath -Recurse -Force
-              Write-Host "[INFO] Removed temporary extract directory $TempExtractPath."
-            }
-          }
-          
-          if (!(Test-Path $ScoopSourceCheckoutPath) -or !(Get-ChildItem $ScoopSourceCheckoutPath)) {
-            Write-Error "[CRITICAL] Scoop source directory '$ScoopSourceCheckoutPath' is empty or not found after extraction and move."
-            exit 1
-          }
-          Remove-Item $ScoopArchivePath -Force
-          Write-Host "[INFO] Removed downloaded archive $ScoopArchivePath."
-          Write-Host "[INFO] --- Scoop Source Download and Extraction Finished ---"
-
-      - name: Diagnostic File Listing for Scoop Source Checkout
-        id: diagnostic_listing
-        shell: pwsh
-        run: |
-          $ScoopSourceDir = "$env:GITHUB_WORKSPACE\scoop_source_checkout"
-          Write-Host "[INFO] --- Diagnostic: Listing Scoop Source Checkout at '$ScoopSourceDir' ---"
-          
-          if (!(Test-Path $ScoopSourceDir -PathType Container)) {
-            Write-Error "[ERROR_DIAG] Scoop source directory '$ScoopSourceDir' does not exist."
-            exit 1
-          }
-          Write-Host "[DEBUG_DIAG] Top-level contents of '$ScoopSourceDir' (Forcing enumeration):"
-          Get-ChildItem -Path $ScoopSourceDir -Depth 0 -Force | ForEach-Object { Write-Output "[DEBUG_DIAG]   L0: $($_.Name) (Mode: $($_.Mode))" }
-          
-          $ScoopModulesDir = Join-Path $ScoopSourceDir "modules"
-          Write-Host "[DEBUG_DIAG] Checking existence of modules directory: '$ScoopModulesDir'. Exists: $(Test-Path $ScoopModulesDir -PathType Container)"
-          Write-Host "[DEBUG_DIAG] Contents of '$ScoopModulesDir' (if it exists, Forcing enumeration):"
-          Get-ChildItem -Path $ScoopModulesDir -ErrorAction SilentlyContinue -Force | ForEach-Object { Write-Output "[DEBUG_DIAG]   L1-Modules: $($_.Name) (Mode: $($_.Mode), Length: $($_.Length))" }
-          
-          $ExpectedModuleFile = Join-Path $ScoopModulesDir "scoop.psm1"
-          Write-Host "[DEBUG_DIAG] Checking existence of expected module file: '$ExpectedModuleFile'. Exists: $(Test-Path $ExpectedModuleFile -PathType Leaf)"
-          if (Test-Path $ExpectedModuleFile -PathType Leaf) {
-            Write-Host "[SUCCESS_DIAG] Expected module file '$ExpectedModuleFile' exists."
-          } else {
-            Write-Error "[ERROR_DIAG] Expected module file '$ExpectedModuleFile' does NOT exist."
-            Write-Host "[DEBUG_DIAG] Deeper listing of '$ScoopSourceDir' (first 2 levels, Forcing enumeration) to investigate:"
-            Get-ChildItem -Path $ScoopSourceDir -Recurse -Depth 1 -Force -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "[DEBUG_DIAG]   $($_.FullName.Replace($env:GITHUB_WORKSPACE, '')) (Mode: $($_.Mode))" }
-          }
-          Write-Host "[INFO] --- End Diagnostic ---"
-
-      - name: Set up Scoop Environment and Run Update-ScoopVersions.ps1
+      - name: Install Scoop, Manually Ensure Scoop App Integrity, and Run Script
         id: scoop_operations
         shell: pwsh
         run: |
-          Write-Host "[INFO] --- Setting up Scoop Environment and Running Update Script ---"
-          $env:SCOOP_HOME = "$env:GITHUB_WORKSPACE\scoop_source_checkout" 
-          echo "SCOOP_HOME=$($env:SCOOP_HOME)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "[INFO] SCOOP_HOME set to: $($env:SCOOP_HOME)"
+          Write-Host "[INFO] --- Starting Scoop Setup ---"
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          $ErrorActionPreference = "Stop" 
+          try {
+            Invoke-RestMethod -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
+          } catch {
+            Write-Warning "[WARNING] Invoke-RestMethod failed. Error: $($_.Exception.Message)"
+            Write-Host "[INFO] Trying with Invoke-WebRequest..."
+            Invoke-WebRequest -Uri https://get.scoop.sh -OutFile scoop_installer.ps1
+          }
+          $ErrorActionPreference = "Continue" 
 
-          $ScoopSourceBinPath = Join-Path $env:SCOOP_HOME "bin"
-          if ($env:PATH -notlike "*$ScoopSourceBinPath*") {
-            $env:PATH = "$ScoopSourceBinPath;$($env:PATH)"
-            Write-Host "[INFO] Added '$ScoopSourceBinPath' to current session PATH."
-          }
-          Add-Content -Path $env:GITHUB_PATH -Value $ScoopSourceBinPath
-          Write-Host "[INFO] Added '$ScoopSourceBinPath' to GITHUB_PATH for subsequent steps."
-          
-          $ScoopModulePathFromSource = Join-Path $env:SCOOP_HOME "modules\scoop.psm1"
-          Write-Host "[INFO] Verifying Module Path (before running script): $ScoopModulePathFromSource"
-          if (!(Test-Path $ScoopModulePathFromSource -PathType Leaf)) {
-            Write-Error "[CRITICAL] Scoop module file '$ScoopModulePathFromSource' NOT FOUND. Cannot proceed with Update-ScoopVersions.ps1."
+          if (!(Test-Path scoop_installer.ps1)) {
+            Write-Error "[CRITICAL] Scoop installer script (scoop_installer.ps1) not found after download attempt."
             exit 1
           }
-          Write-Host "[SUCCESS] Scoop module file FOUND at '$ScoopModulePathFromSource'."
+
+          Write-Host "[ACTION] Running Scoop installer..."
+          $env:SCOOP = "$HOME\scoop" 
+          if (-not (Test-Path $env:SCOOP)) {
+            New-Item -ItemType Directory -Path $env:SCOOP -Force | Out-Null
+          }
+          .\scoop_installer.ps1 -RunSelfUpdate -ScoopDir $env:SCOOP 
+          Write-Host "[SUCCESS] Scoop installation script executed."
+
+          $ScoopShimsPath = Join-Path $env:SCOOP "shims"
+          Write-Host "[INFO] Determined Scoop Shims Path: $ScoopShimsPath"
           
-          $ScriptPath = "./Update-ScoopVersions.ps1" 
-          Write-Host "[ACTION] Running PowerShell Script: $ScriptPath"
-          if (!(Test-Path $ScriptPath)) {
-            Write-Error "[CRITICAL] Update-ScoopVersions.ps1 not found at '$ScriptPath'."
+          if ($env:PATH -notlike "*$ScoopShimsPath*") {
+            $env:PATH = "$ScoopShimsPath;$($env:PATH)"
+            Write-Host "[INFO] Added '$ScoopShimsPath' to current session PATH."
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
+          Write-Host "[INFO] Added '$ScoopShimsPath' to GITHUB_PATH."
+          
+          Write-Host "[INFO] Verifying basic Scoop command after initial install..."
+          scoop --version
+          scoop status
+          Remove-Item scoop_installer.ps1 -Force
+          Write-Host "[INFO] Removed scoop_installer.ps1."
+
+          # --- Manually download and overwrite the 'scoop' app itself ---
+          $ScoopAppDir = Join-Path $env:SCOOP "apps\scoop"
+          $ScoopAppCurrentDir = Join-Path $ScoopAppDir "current"
+          $ScoopAppReleaseUrl = "https://github.com/ScoopInstaller/Scoop/releases/latest/download/Scoop-v0.5.2.zip" # Example, ideally get latest dynamically or use a fixed known good version
+          # To get latest release dynamically (more complex, requires parsing GitHub API or release page)
+          # For now, let's assume a recent, known-good version like v0.5.2 (check latest on Scoop's GitHub releases)
+          # Or, even better, use the source archive as it's always master
+          $ScoopAppSourceArchiveUrl = "https://github.com/ScoopInstaller/Scoop/archive/refs/heads/master.zip"
+          $ScoopAppArchivePath = "$env:GITHUB_WORKSPACE\scoop_app_source.zip"
+          $TempAppExtractPath = "$env:GITHUB_WORKSPACE\scoop_app_temp_extract"
+
+          Write-Host "[ACTION] Downloading Scoop app source archive from $ScoopAppSourceArchiveUrl to ensure full content..."
+          try {
+            Invoke-WebRequest -Uri $ScoopAppSourceArchiveUrl -OutFile $ScoopAppArchivePath
+            Write-Host "[SUCCESS] Scoop app source archive downloaded to $ScoopAppArchivePath"
+          } catch {
+            Write-Error "[CRITICAL] Failed to download Scoop app source archive. Error: $($_.Exception.Message)"
             exit 1
           }
-          # Execute the script
-          & $ScriptPath -BucketPath "./bucket" 
-          $ScriptExitCode = $LASTEXITCODE
+
+          if (Test-Path $ScoopAppCurrentDir) {
+            Write-Host "[ACTION] Removing existing '$ScoopAppCurrentDir' to ensure clean overwrite."
+            Remove-Item -Recurse -Force $ScoopAppCurrentDir
+          }
+          New-Item -ItemType Directory -Path $ScoopAppCurrentDir -Force | Out-Null
           
-          if ($ScriptExitCode -ne 0) {
-            Write-Warning "[WARNING] Update-ScoopVersions.ps1 script finished with non-zero exit code: $ScriptExitCode."
+          if (Test-Path $TempAppExtractPath) { Remove-Item -Recurse -Force $TempAppExtractPath }
+          New-Item -ItemType Directory -Path $TempAppExtractPath -Force | Out-Null
+
+          Write-Host "[ACTION] Extracting Scoop app source archive '$ScoopAppArchivePath' to '$TempAppExtractPath'..."
+          try {
+            Expand-Archive -Path $ScoopAppArchivePath -DestinationPath $TempAppExtractPath -Force
+            $ExtractedItems = Get-ChildItem -Path $TempAppExtractPath
+            if ($ExtractedItems.Count -eq 1 -and $ExtractedItems[0].PSIsContainer) {
+                $TopLevelFolderNameInZip = $ExtractedItems[0].FullName
+                Write-Host "[INFO] Detected single top-level folder in app ZIP: $TopLevelFolderNameInZip."
+                Write-Host "[ACTION] Moving contents from '$TopLevelFolderNameInZip' to '$ScoopAppCurrentDir'..."
+                Move-Item -Path (Join-Path $TopLevelFolderNameInZip "*") -Destination $ScoopAppCurrentDir -Force
+            } else {
+                Write-Warning "[WARNING] No single top-level folder, or multiple items, found in app ZIP. Moving all from '$TempAppExtractPath'."
+                Move-Item -Path (Join-Path $TempAppExtractPath "*") -Destination $ScoopAppCurrentDir -Force
+            }
+            Write-Host "[SUCCESS] Scoop app contents overwritten in '$ScoopAppCurrentDir'."
+          } catch {
+            Write-Error "[CRITICAL] Failed to extract or move Scoop app archive contents. Error: $($_.Exception.Message)"
+            exit 1
+          } finally {
+            if (Test-Path $TempAppExtractPath) { Remove-Item $TempAppExtractPath -Recurse -Force }
+          }
+          Remove-Item $ScoopAppArchivePath -Force
+          Write-Host "[INFO] Removed downloaded Scoop app source archive."
+
+          # CRITICAL CHECK: Verify module existence AFTER manual overwrite
+          $ScoopModulePath = Join-Path $ScoopAppCurrentDir "modules\scoop.psm1"
+          Write-Host "[INFO] Expected Scoop Module Path after app overwrite: $ScoopModulePath"
+          if (Test-Path $ScoopModulePath -PathType Leaf) {
+            Write-Output "[SUCCESS] Scoop module file FOUND at '$ScoopModulePath'."
           } else {
-            Write-Host "[SUCCESS] Update-ScoopVersions.ps1 script finished successfully (Exit Code 0)."
+            Write-Error "[CRITICAL FAILURE] Scoop module file NOT FOUND at '$ScoopModulePath' even after manual app overwrite."
+            Write-Host "Listing contents of '$ScoopAppCurrentDir\modules\' (if it exists):"
+            Get-ChildItem (Join-Path $ScoopAppCurrentDir "modules") -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
+            Write-Host "Listing contents of '$ScoopAppCurrentDir\':"
+            Get-ChildItem $ScoopAppCurrentDir -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  - $($_.Name)" }
+            exit 1 
           }
-          Write-Host "[INFO] --- Scoop Environment Setup and Update Script Finished ---"
+          
+          Write-Host "[INFO] Updating core buckets (main, extras)..."
+          scoop bucket rm main -ErrorAction SilentlyContinue
+          scoop bucket add main
+          scoop bucket rm extras -ErrorAction SilentlyContinue
+          scoop bucket add extras
+          scoop update 
+          Write-Host "[SUCCESS] Scoop and core buckets update process finished."
 
+          $ScriptPath = "./Update-ScoopVersions.ps1" 
+          Write-Host "[ACTION] Running PowerShell Script: $ScriptPath with Shims Path parameter '$ScoopShimsPath'"
+          if (!(Test-Path $ScriptPath)) {
+            Write-Error "[CRITICAL] $ScriptPath not found."
+            exit 1
+          }
+          & $ScriptPath -BucketPath "./bucket" -ProvidedScoopShimsPath $ScoopShimsPath
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "[WARNING] Update-ScoopVersions.ps1 script finished with exit code $LASTEXITCODE."
+          } else {
+            Write-Host "[SUCCESS] Update-ScoopVersions.ps1 script finished successfully."
+          }
+          Write-Host "[INFO] --- Scoop Operations Finished ---"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -196,25 +176,20 @@ jobs:
           Write-Host "[SUCCESS] Python script finished."
 
       - name: Commit and Push Changes
-        shell: bash # Using bash for git commands is common
+        shell: bash
         run: |
           echo "[INFO] --- Starting Commit and Push ---"
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
           echo "[DEBUG] Current directory: $(pwd)"
           echo "[INFO] Git Status Before Add:"
           git status
-          
           git add bucket/*.json README.md
-          
           echo "[INFO] Git Status After Add (Before Commit):"
           git status
-
-          # Check if there are staged changes to commit
           if ! git diff --cached --quiet; then
             echo "[ACTION] Changes detected and staged. Committing and pushing..."
-            git commit -m "Automated: Update app manifests, hashes, and README"
+            git commit -m "Automated: Update app hashes and README"
             git push
             echo "[SUCCESS] Changes committed and pushed."
           else
