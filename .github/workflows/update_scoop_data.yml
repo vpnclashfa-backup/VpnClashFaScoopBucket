@@ -44,14 +44,21 @@ jobs:
           Write-Host "Scoop installation script executed."
           
           $ScoopShimsPath = Join-Path $env:SCOOP "shims"
+          Write-Host "Determined Scoop Shims Path: $ScoopShimsPath"
           
-          # Add Scoop shims to GITHUB_PATH for any *future* steps (though we aim to do most here)
+          # Add Scoop shims to GITHUB_PATH for any *future* steps
+          # This ensures if other PowerShell steps are added later, they might pick it up.
           Add-Content -Path $env:GITHUB_PATH -Value $ScoopShimsPath
           Write-Host "Added '$ScoopShimsPath' to GITHUB_PATH (for potential future steps)."
 
           # Crucially, add to current session's PATH for immediate use in *this* run block
-          $env:PATH = "$ScoopShimsPath;$env:PATH"
-          Write-Host "Added '$ScoopShimsPath' to current session PATH."
+          # Ensure it's added only once to avoid excessive duplication if script runs multiple times in theory
+          if ($env:PATH -notlike "*$ScoopShimsPath*") {
+            $env:PATH = "$ScoopShimsPath;$env:PATH"
+            Write-Host "Added '$ScoopShimsPath' to current session PATH."
+          } else {
+            Write-Host "'$ScoopShimsPath' already in current session PATH."
+          }
           Write-Host "Updated PATH for current session: $env:PATH"
 
           # Verify Scoop immediately in this session
@@ -59,32 +66,26 @@ jobs:
           scoop --version
           scoop status
           
-          # Clean up installer script
           Remove-Item scoop_installer.ps1 -Force
           Write-Host "Removed scoop_installer.ps1."
 
           # --- Update Scoop itself and core buckets ---
           Write-Host "Updating Scoop and core buckets..."
           scoop update scoop
-          scoop bucket rm main -ErrorAction SilentlyContinue # Okay to fail if not exists
+          scoop bucket rm main -ErrorAction SilentlyContinue 
           scoop bucket add main
-          scoop bucket rm extras -ErrorAction SilentlyContinue # Okay to fail if not exists
+          scoop bucket rm extras -ErrorAction SilentlyContinue 
           scoop bucket add extras
           scoop update
           Write-Host "Scoop and core buckets update process finished."
 
           # --- Run PowerShell Script to Update Manifest Versions & URLs ---
-          Write-Host "Running PowerShell Script: ./Update-ScoopVersions.ps1"
-          # Ensure the script is executable if needed, though usually not for .ps1
-          # Get-ChildItem ./Update-ScoopVersions.ps1 | Unblock-File -ErrorAction SilentlyContinue
-          ./Update-ScoopVersions.ps1 -BucketPath "./bucket"
+          Write-Host "Running PowerShell Script: ./Update-ScoopVersions.ps1 with Shims Path parameter"
+          # Pass the determined $ScoopShimsPath to the script
+          ./Update-ScoopVersions.ps1 -BucketPath "./bucket" -ProvidedScoopShimsPath $ScoopShimsPath
           Write-Host "Update-ScoopVersions.ps1 script finished."
 
-        # We are not using continue-on-error here for the whole step.
-        # If Scoop install or the main script fails critically, we want the job to reflect that.
-        # Individual scoop commands inside can use -ErrorAction SilentlyContinue if needed.
-
-      # Python steps remain separate as they don't depend on the PowerShell PATH in the same way
+      # Python steps remain separate
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

@@ -1,13 +1,27 @@
 ﻿# Update-ScoopVersions.ps1
 param (
-    [string]$BucketPath = "./bucket"
+    [string]$BucketPath = "./bucket",
+    [string]$ProvidedScoopShimsPath = "" # New parameter
 )
 
 Write-Output "Starting to update manifest versions and URLs in bucket: $BucketPath"
+
+# If a specific shims path is provided, prepend it to the current session's PATH
+if (-not [string]::IsNullOrWhiteSpace($ProvidedScoopShimsPath)) {
+    if (Test-Path $ProvidedScoopShimsPath) {
+        Write-Output "Provided Scoop Shims Path: $ProvidedScoopShimsPath. Prepending to PATH for this script's session."
+        $env:PATH = "$ProvidedScoopShimsPath;$($env:PATH)"
+        Write-Output "Updated PATH for this script's session: $($env:PATH)"
+    } else {
+        Write-Warning "Provided Scoop Shims Path '$ProvidedScoopShimsPath' does not exist. Relying on existing PATH."
+    }
+} else {
+    Write-Output "No explicit Scoop Shims Path provided. Relying on existing PATH or Scoop's default setup."
+}
+
 Write-Output "Attempting to ensure Scoop environment is initialized..."
 
 # Determine Scoop root path. $env:SCOOP is usually set by Scoop itself.
-# If not, fall back to the default user profile path.
 $ScoopRootPath = $env:SCOOP
 if (-not $ScoopRootPath -or !(Test-Path $ScoopRootPath)) {
     $ScoopRootPath = Join-Path $env:USERPROFILE "scoop"
@@ -17,31 +31,29 @@ if (-not $ScoopRootPath -or !(Test-Path $ScoopRootPath)) {
 }
 
 $ScoopModulePath = Join-Path $ScoopRootPath "apps\scoop\current\modules\scoop.psm1"
-$ScoopShimsPath = Join-Path $ScoopRootPath "shims"
 
+# Attempt to import Scoop module (optional, as scoop.exe should work if in PATH)
 if (Test-Path $ScoopModulePath) {
     try {
-        Import-Module $ScoopModulePath -ErrorAction Stop
-        Write-Output "Scoop module imported from $ScoopModulePath"
-        # Ensure shims are in path for the current session if not already (belt-and-suspenders)
-        if ($env:PATH -notlike "*$ScoopShimsPath*") {
-            $env:PATH = "$ScoopShimsPath;$env:PATH"
-            Write-Output "Added $ScoopShimsPath to session PATH."
-        }
+        Import-Module $ScoopModulePath -ErrorAction SilentlyContinue # Continue if import fails
+        Write-Output "Attempted to import Scoop module from $ScoopModulePath"
     } catch {
-        Write-Warning "Could not import Scoop module from $ScoopModulePath. Scoop commands might still work if scoop.exe is in PATH. Error: $($_.Exception.Message)"
+        Write-Warning "Could not import Scoop module from $ScoopModulePath. Error: $($_.Exception.Message)"
     }
 } else {
-    Write-Warning "Scoop module not found at expected path: $ScoopModulePath. Relying on scoop.exe in PATH."
+    Write-Warning "Scoop module not found at expected path: $ScoopModulePath."
 }
 
 Write-Output "--------------------------------------------------------------------"
 Write-Output "Verifying scoop.exe command availability..."
 $ScoopExeCommand = Get-Command scoop.exe -ErrorAction SilentlyContinue
 if ($ScoopExeCommand) {
-    Write-Output "scoop.exe found at: $($ScoopExeCommand.Source)"
+    Write-Output "scoop.exe found by Get-Command at: $($ScoopExeCommand.Source)"
 } else {
-    Write-Error "scoop.exe not found in PATH. Cannot proceed with checkver."
+    Write-Error "scoop.exe NOT FOUND by Get-Command in this script's context. Cannot proceed with checkver."
+    # Try to list directories in PATH for debugging
+    Write-Output "Current PATH directories:"
+    $env:PATH -split ';' | ForEach-Object { Write-Output "  - $_" }
     exit 1
 }
 Write-Output "--------------------------------------------------------------------"
@@ -54,7 +66,7 @@ if (-not $ManifestFiles) {
     exit 0 # Exit gracefully if no files to process
 }
 
-$GlobalSuccess = $true # Assume success unless an unexpected error occurs
+$GlobalSuccess = $true 
 
 foreach ($ManifestFile in $ManifestFiles) {
     $AppName = $ManifestFile.BaseName
@@ -63,13 +75,10 @@ foreach ($ManifestFile in $ManifestFiles) {
 
     try {
         Write-Output "  Running 'scoop.exe checkver `"$AppName`" -u'..."
-        # Explicitly call scoop.exe
         $ProcessOutput = scoop.exe checkver "$AppName" -u *>&1
         
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "  'scoop.exe checkver -u' for '$AppName' likely finished with warnings (e.g., no update found) or an error (Exit Code: $LASTEXITCODE)."
-            # Note: 'scoop checkver' can exit with non-zero for legitimate reasons like app already up-to-date.
-            # We don't set $GlobalSuccess = $false here unless it's an unexpected script error.
         } else {
             Write-Output "  'scoop.exe checkver -u' for '$AppName' completed successfully (or an update was applied)."
         }
@@ -81,7 +90,7 @@ foreach ($ManifestFile in $ManifestFiles) {
 
     } catch {
         Write-Error "  An UNEXPECTED error occurred while running 'scoop.exe checkver -u' for '$AppName': $($_.Exception.Message)"
-        $GlobalSuccess = $false # This is for true script errors, not scoop command exit codes
+        $GlobalSuccess = $false
     }
     Write-Output "---------------------------"
 }
@@ -90,9 +99,7 @@ Write-Output ""
 Write-Output "===================================================================="
 if ($GlobalSuccess) {
     Write-Output "Manifest version and URL update process completed its run."
-    Write-Output "Review individual app logs for specific checkver outcomes (updates, warnings, errors)."
+    Write-Output "Review individual app logs for specific checkver outcomes."
 } else {
     Write-Warning "Manifest version and URL update process completed with some UNEXPECTED SCRIPT errors."
 }
-# The workflow's continue-on-error handles whether the job proceeds.
-# This script doesn't need to force an exit code unless a catastrophic failure occurs early.
