@@ -1,0 +1,61 @@
+﻿name: Update Scoop Manifests and README (Python)
+
+on:
+  workflow_dispatch: # Allows manual triggering from the Actions tab
+  schedule:
+    - cron: '30 16 * * *' # Runs daily at 16:30 UTC (approximately 8:00 PM Tehran time)
+
+jobs:
+  update_manifests:
+    runs-on: windows-latest # Scoop and PowerShell (for scoop checkver) are available
+
+    # Grant permissions for the GITHUB_TOKEN to commit and push changes
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Using GITHUB_TOKEN for operations like push.
+          # If you use a Personal Access Token (PAT), store it as a secret
+          # and use `token: ${{ secrets.YOUR_PAT_SECRET_NAME }}` instead.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # Specify a Python 3.x version
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+        shell: pwsh # Using PowerShell for consistency, but 'bash' or 'cmd' could also work
+
+      - name: Run Python script to update manifests
+        id: run_update_script
+        run: python update_manifests.py # Assumes script is in the repo root
+        shell: pwsh
+        # The Python script should handle its own errors and print warnings.
+        # We'll let the job continue so the commit step can run if there are changes.
+        # continue-on-error: true 
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if there are any changes to commit
+          # `git diff --quiet HEAD` exits with 1 if there are uncommitted changes, 0 otherwise.
+          if ! git diff --quiet HEAD; then
+            echo "Changes detected, committing and pushing..."
+            # Add all .json files in the bucket directory and the README.md
+            # This assumes manifests are in 'bucket/' and README.md is in root.
+            git add bucket/*.json README.md 
+            git commit -m "Automated: Update app manifests and README (Python)"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+        shell: bash # 'bash' is often more convenient for git commands in actions
