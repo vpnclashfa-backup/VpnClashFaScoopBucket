@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "1.9.7",
     "description": "A graphical user interface for SingBox.",
     "homepage": "https://github.com/GUI-for-Cores/GUI.for.SingBox",
@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/GUI-for-Cores/GUI.for.SingBox/releases/download/v1.9.7/GUI.for.SingBox-windows-amd64.zip",
-            "hash": ""
+            "hash": "232ca74528fd10bf600f804015f1786daba97e5f3eb07af70479fc1bc6342a16"
         }
     },
     "bin": "GUI.for.SingBox.exe",

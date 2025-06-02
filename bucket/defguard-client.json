@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "1.2.3",
     "description": "DefGuard VPN Client for seamless and secure network access.",
     "homepage": "https://github.com/DefGuard/client",
@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/DefGuard/client/releases/download/v1.2.3/defguard-client_1.2.3_x64_en-US.exe",
-            "hash": ""
+            "hash": "6b326faced9a635f162df8c9e09ddc46eb3dd59a3c2c749175329aa81509abb6"
         }
     },
     "installer": {
@@ -19,8 +19,10 @@
         ]
     },
     "bin": [
-        [ "DefGuard Client.exe", "defguard-client" ] 
-
+        [
+            "DefGuard Client.exe",
+            "defguard-client"
+        ]
     ],
     "shortcuts": [
         [

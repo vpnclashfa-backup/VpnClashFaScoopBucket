@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "0.0.8",
     "description": "A TLS/SSL swiss army knife and proxy. (Go version)",
     "homepage": "https://github.com/anytls/anytls-go",
@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/anytls/anytls-go/releases/download/v0.0.8/anytls_0.0.8_windows_amd64.zip",
-            "hash": ""
+            "hash": "d3e29c0ca3bc0c5a40ec8c46a25d2ae534f5621db4184874ade520be8dd9c502"
         }
     },
     "bin": "anytls.exe",

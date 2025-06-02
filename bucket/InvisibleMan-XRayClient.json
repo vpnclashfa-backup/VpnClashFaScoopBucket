@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "3.2.5",
     "description": "A simple and powerful XRay client for Windows, part of the InvisibleMan project.",
     "homepage": "https://github.com/InvisibleManVPN/InvisibleMan-XRayClient",
@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/InvisibleManVPN/InvisibleMan-XRayClient/releases/download/v3.2.5/InvisibleManXRay-x64.zip",
-            "hash": ""
+            "hash": "e41306a32375e23cb2f81f60230e165075d336f0a5682dd57aef75cbe802f183"
         }
     },
     "bin": "InvisibleMan.exe",
