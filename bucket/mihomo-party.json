@@ -1,12 +1,12 @@
 ﻿{
-    "version": "1.7.4",
+    "version": "1.7.5",
     "description": "A GUI client for mihomo (Clash.Meta core).",
     "homepage": "https://github.com/mihomo-party-org/mihomo-party",
     "license": "GPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/mihomo-party-org/mihomo-party/releases/download/v1.7.4/mihomo-party-windows-1.7.4-x64-setup.exe",
-            "hash": "9f96fc4181f9cdb208873eebf962a51ef5b2f2eb7b91fb06d2ee1a9755efd93e"
+            "url": "https://github.com/mihomo-party-org/mihomo-party/releases/download/v1.7.5/mihomo-party-windows-1.7.5-x64-setup.exe",
+            "hash": "197fc073cfa440b64a9d3fb5cfffc6542e029ba9164f4be5feac0e19a6ecad3a"
         }
     },
     "installer": {
