@@ -1,12 +1,12 @@
 ﻿{
-    "version": "0.8.85",
+    "version": "0.8.86",
     "description": "Yet another clash gui.",
     "homepage": "https://github.com/chen08209/FlClash",
     "license": "Apache-2.0",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/chen08209/FlClash/releases/download/v0.8.85/FlClash-0.8.85-windows-amd64-setup.exe",
-            "hash": "52120784f0f16e47abe3d31d57006003786041e84985c2bf38ebf6924f217c57"
+            "url": "https://github.com/chen08209/FlClash/releases/download/v0.8.86/FlClash-0.8.86-windows-amd64-setup.exe",
+            "hash": "72b544b4d88f98aee3664bff24b65e69a3e7a5a2d7fb772836ea6c14976add09"
         }
     },
     "installer": {

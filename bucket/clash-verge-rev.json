@@ -1,48 +1,48 @@
-{
-    "version":  "2.2.3",
-    "description":  "A Clash GUI based on tauri. Supports Windows, macOS and Linux.",
-    "homepage":  "https://github.com/clash-verge-rev/clash-verge-rev",
-    "license":  "GPL-3.0-only",
-    "architecture":  {
-                         "64bit":  {
-                                       "url":  "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v2.2.3/Clash.Verge_2.2.3_x64-setup.exe",
-                                       "hash":  "dc252a38f57923bd1afb12a6bd88236851b1106ee0f7042fce147a94e14474c6"
-                                   }
-                     },
-    "installer":  {
-                      "script":  [
-                                     "$fname = (Get-Item \"$dir\\Clash.Verge_*-setup.exe\").Name",
-                                     "Write-Host \"Attempting to install $fname silently to $dir\"",
-                                     "$processOptions = @{",
-                                     "    FilePath = \"$dir\\$fname\"",
-                                     "    ArgumentList = @(\u0027/S\u0027, \"/D=`\"$dir`\"\")",
-                                     "    Wait = $true",
-                                     "    PassThru = $true",
-                                     "    Verb = \u0027RunAs\u0027",
-                                     "}",
-                                     "$process = Start-Process @processOptions",
-                                     "if ($process.ExitCode -ne 0) {",
-                                     "    error \"Installer exited with code: $($process.ExitCode)\"",
-                                     "    exit 1",
-                                     "}",
-                                     "Write-Host \"Installation probably finished. Check $dir for Clash Verge.exe\""
-                                 ]
-                  },
-    "bin":  "Clash Verge.exe",
-    "shortcuts":  [
-                      [
-                          "Clash Verge.exe",
-                          "Clash Verge"
-                      ]
-                  ],
-    "checkver":  {
-                     "github":  "https://github.com/clash-verge-rev/clash-verge-rev"
-                 },
-    "autoupdate":  {
-                       "architecture":  {
-                                            "64bit":  {
-                                                          "url":  "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v$version/Clash.Verge_$version_x64-setup.exe"
-                                                      }
-                                        }
-                   }
+﻿{
+    "version": "2.3.0",
+    "description": "A Clash GUI based on tauri. Supports Windows, macOS and Linux.",
+    "homepage": "https://github.com/clash-verge-rev/clash-verge-rev",
+    "license": "GPL-3.0-only",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v2.3.0/Clash.Verge_2.3.0_x64-setup.exe",
+            "hash": "44bc51d3f0c43eac6c3ea39f982cce9d5b7258e0818f4bb37f58156dc8a08155"
+        }
+    },
+    "installer": {
+        "script": [
+            "$fname = (Get-Item \"$dir\\Clash.Verge_*-setup.exe\").Name",
+            "Write-Host \"Attempting to install $fname silently to $dir\"",
+            "$processOptions = @{",
+            "    FilePath = \"$dir\\$fname\"",
+            "    ArgumentList = @('/S', \"/D=`\"$dir`\"\")",
+            "    Wait = $true",
+            "    PassThru = $true",
+            "    Verb = 'RunAs'",
+            "}",
+            "$process = Start-Process @processOptions",
+            "if ($process.ExitCode -ne 0) {",
+            "    error \"Installer exited with code: $($process.ExitCode)\"",
+            "    exit 1",
+            "}",
+            "Write-Host \"Installation probably finished. Check $dir for Clash Verge.exe\""
+        ]
+    },
+    "bin": "Clash Verge.exe",
+    "shortcuts": [
+        [
+            "Clash Verge.exe",
+            "Clash Verge"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/clash-verge-rev/clash-verge-rev"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v$version/Clash.Verge_$version_x64-setup.exe"
+            }
+        }
+    }
 }
