@@ -1,12 +1,12 @@
 ﻿{
-    "version": "1.9.8",
+    "version": "1.9.9",
     "description": "A graphical user interface for SingBox.",
     "homepage": "https://github.com/GUI-for-Cores/GUI.for.SingBox",
     "license": "GPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/GUI-for-Cores/GUI.for.SingBox/releases/download/v1.9.8/GUI.for.SingBox-windows-amd64.zip",
-            "hash": "ae6fa26997824262ba295c369cfede0a0b6972ba122377944d08cc8b150c76be"
+            "url": "https://github.com/GUI-for-Cores/GUI.for.SingBox/releases/download/v1.9.9/GUI.for.SingBox-windows-amd64.zip",
+            "hash": "d1dc93d21e86ecda34ab3a9222cc9e8bc74e328a79c9c3a9fbd52f2b08be01d1"
         }
     },
     "bin": "GUI.for.SingBox.exe",
