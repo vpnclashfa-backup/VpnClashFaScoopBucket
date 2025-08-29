@@ -1,12 +1,12 @@
 ﻿{
-    "version": "1.9.9",
+    "version": "1.9.10",
     "description": "A GUI for Clash Core, support Windows and Linux",
     "homepage": "https://github.com/GUI-for-Cores/GUI.for.Clash",
     "license": "GPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/GUI-for-Cores/GUI.for.Clash/releases/download/v1.9.9/GUI.for.Clash-windows-amd64.zip",
-            "hash": "6be611ad7a11f129286417b999bd35e607a5892a3bd6743fa5f42bbdbe590969"
+            "url": "https://github.com/GUI-for-Cores/GUI.for.Clash/releases/download/v1.9.10/GUI.for.Clash-windows-amd64.zip",
+            "hash": "3d7f0eec63a616afdccf7cd009e8f50ba539f06e50add8168a4ec3b8cfb57501"
         }
     },
     "bin": "GUI.for.Clash.exe",
