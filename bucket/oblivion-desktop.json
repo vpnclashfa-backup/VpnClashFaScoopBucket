@@ -1,12 +1,12 @@
 ﻿{
-    "version": "2.106.5",
+    "version": "3.0.0",
     "description": "Oblivion with Warp and Psiphon, cross-platform desktop client.",
     "homepage": "https://github.com/bepass-org/oblivion-desktop",
     "license": "GPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/bepass-org/oblivion-desktop/releases/download/v2.106.5/oblivion-desktop-win-x64.exe",
-            "hash": "b47262e3d6fd2ca05ed22a5a2abbdb9b1594de58b42e6e961420c2cfb979b484"
+            "url": "https://github.com/bepass-org/oblivion-desktop/releases/download/v3.0.0/oblivion-desktop-win-x64.exe",
+            "hash": "579c1fe9b7ec28ce0cfcba3a063e1798cc0dee08b574fcfd5c2d423a92265bdc"
         }
     },
     "installer": {
