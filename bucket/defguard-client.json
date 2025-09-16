@@ -1,12 +1,12 @@
 ﻿{
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "DefGuard VPN Client for seamless and secure network access.",
     "homepage": "https://github.com/DefGuard/client",
     "license": "AGPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/DefGuard/client/releases/download/v1.4.0/defguard-client_1.4.0_x64_en-US.exe",
-            "hash": "2d131c76b8797ac0fffc2c00640d5c60ca69a1343df595f53485aa012840d379"
+            "url": "https://github.com/DefGuard/client/releases/download/v1.5.0/defguard-client_1.5.0_x64_en-US.exe",
+            "hash": "2fe5bfe84b038b5b54a971d4d8c2e4b3962814d146e87d5983d702fbe6a97b44"
         }
     },
     "installer": {
