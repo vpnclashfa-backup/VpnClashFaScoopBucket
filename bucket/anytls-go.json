@@ -1,12 +1,12 @@
 ﻿{
-    "version": "0.0.10",
+    "version": "0.0.11",
     "description": "A TLS/SSL swiss army knife and proxy. (Go version)",
     "homepage": "https://github.com/anytls/anytls-go",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/anytls/anytls-go/releases/download/v0.0.10/anytls_0.0.10_windows_amd64.zip",
-            "hash": "3ba376cc1cad893802420f859ca5211735b0fdb32f7e0c932e7447dd35f801b5"
+            "url": "https://github.com/anytls/anytls-go/releases/download/v0.0.11/anytls_0.0.11_windows_amd64.zip",
+            "hash": "4c6cc9160e314e55bd7f7a2267dfa686ee901750165627f1412f3da312e6ae93"
         }
     },
     "bin": "anytls.exe",
