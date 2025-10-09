@@ -1,12 +1,12 @@
 ﻿{
-    "version": "2.2.7.2",
+    "version": "2.2.7.3",
     "description": "A web GUI client of Project V which supports V2Ray, Xray, SS, SSR, Trojan and Pingtunnel.",
     "homepage": "https://github.com/v2rayA/v2rayA",
     "license": "AGPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/v2rayA/v2rayA/releases/download/v2.2.7.2/installer_windows_inno_x64_2.2.7.2.exe",
-            "hash": "9c9afe929d774450e5e690080a4e2aca8a63f89a81518c11d0896ee672e17ac2"
+            "url": "https://github.com/v2rayA/v2rayA/releases/download/v2.2.7.3/installer_windows_inno_x64_2.2.7.3.exe",
+            "hash": "3254d881d6243315b80b14bd21f2d9cc0bc1531b4d8cc149e11edfcef7a282f8"
         }
     },
     "installer": {
